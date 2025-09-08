@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Davet Edildiğim Sözleşmeler - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <!-- Başlık -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="fas fa-envelope-open me-3"></i>
+                    Davet Edildiğim Sözleşmeler
+                </h1>
+                <p class="lead text-muted">
+                    Size gönderilen sözleşmeleri burada görebilir ve yönetebilirsiniz
+                </p>
+            </div>
+
+            <!-- İstatistikler -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-light border-0">
+                        <div class="card-body text-center">
+                            <div class="h1 text-primary">{{ total_invited }}</div>
+                            <div class="text-muted">Toplam Davet</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-warning border-0">
+                        <div class="card-body text-center">
+                            <div class="h1 text-white">{{ pending_count }}</div>
+                            <div class="text-white">Bekleyen</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success border-0">
+                        <div class="card-body text-center">
+                            <div class="h1 text-white">{{ accepted_count }}</div>
+                            <div class="text-white">Kabul Edilen</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sözleşmeler -->
+            {% if contracts %}
+                <div class="row g-4">
+                    {% for contract in contracts %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 border-0 shadow-sm hover-lift">
+                                <div class="card-body d-flex flex-column">
+                                    <!-- Sözleşme Başlığı -->
+                                    <h5 class="card-title fw-bold mb-3">
+                                        <a href="{% url 'contracts:contract_detail' pk=contract.pk %}"
+                                           class="text-decoration-none text-dark">
+                                            {{ contract.title }}
+                                        </a>
+                                    </h5>
+
+                                    <!-- Sözleşme Bilgileri -->
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-user me-1"></i>
+                                                {{ contract.creator.get_full_name|default:contract.creator.username }}
+                                            </small>
+                                            <small class="text-muted">
+                                                <i class="fas fa-calendar me-1"></i>
+                                                {{ contract.created_at|date:"d.m.Y" }}
+                                            </small>
+                                        </div>
+
+                                        <!-- Rol Bilgisi -->
+                                        <div class="mb-2">
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-user-tag me-1"></i>
+                                                Rolünüz: {{ contract.user_party_role }}
+                                            </span>
+                                        </div>
+
+                                        <!-- Davet Durumu -->
+                                        <div class="mb-2">
+                                            {% if contract.invitation_status == 'pending' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    Davet Bekliyor
+                                                </span>
+                                            {% elif contract.invitation_status == 'accepted' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>
+                                                    Davet Kabul Edildi
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Sözleşme İçeriği Özeti -->
+                                    <p class="card-text text-muted flex-grow-1">
+                                        {{ contract.content|truncatechars:100 }}
+                                    </p>
+
+                                    <!-- Durum Bilgileri -->
+                                    <div class="mb-3">
+                                        <!-- İmza Durumu -->
+                                        {% if contract.user_signature %}
+                                            {% if contract.user_signature.is_signed %}
+                                                <div class="alert alert-success py-2 mb-2">
+                                                    <small>
+                                                        <i class="fas fa-signature me-1"></i>
+                                                        {{ contract.user_signature.signed_at|date:"d.m.Y H:i" }} tarihinde imzalandı
+                                                    </small>
+                                                </div>
+                                            {% else %}
+                                                <div class="alert alert-warning py-2 mb-2">
+                                                    <small>
+                                                        <i class="fas fa-exclamation-triangle me-1"></i>
+                                                        İmza bekleniyor
+                                                    </small>
+                                                </div>
+                                            {% endif %}
+                                        {% endif %}
+
+                                        <!-- Onay Durumu -->
+                                        {% if contract.user_approval %}
+                                            {% if contract.user_approval.is_approved %}
+                                                <div class="alert alert-info py-2 mb-2">
+                                                    <small>
+                                                        <i class="fas fa-thumbs-up me-1"></i>
+                                                        {{ contract.user_approval.approved_at|date:"d.m.Y H:i" }} tarihinde onaylandı
+                                                    </small>
+                                                </div>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Aksiyon Butonları -->
+                                    <div class="d-flex gap-2 mt-auto">
+                                        <a href="{% url 'contracts:contract_detail' pk=contract.pk %}"
+                                           class="btn btn-outline-primary btn-sm flex-fill">
+                                            <i class="fas fa-eye me-1"></i>Görüntüle
+                                        </a>
+
+                                        {% if contract.can_approve %}
+                                            <button class="btn btn-outline-success btn-sm"
+                                                    onclick="approveContract('{{ contract.pk }}')">
+                                                <i class="fas fa-thumbs-up me-1"></i>Onayla
+                                            </button>
+                                        {% endif %}
+
+                                        {% if contract.can_sign %}
+                                            <a href="{% url 'contracts:contract_sign' pk=contract.pk %}"
+                                               class="btn btn-success btn-sm">
+                                                <i class="fas fa-signature me-1"></i>İmzala
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Boş Durum -->
+                <div class="text-center py-5">
+                    <div class="empty-state">
+                        <i class="fas fa-envelope fa-4x text-muted mb-4"></i>
+                        <h3 class="text-muted">Henüz Sözleşme Daveti Yok</h3>
+                        <p class="text-muted mb-4">
+                            Size gönderilen sözleşme davetleri burada görünecektir.
+                        </p>
+                        <a href="{% url 'contracts:contract_pool' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-search me-2"></i>
+                            Sözleşme Havuzu'na Git
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Onay Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-thumbs-up me-2"></i>Sözleşmeyi Onayla
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Bu sözleşmeyi onaylamak istediğinizden emin misiniz?</p>
+                <p class="text-muted small">
+                    Onayladıktan sonra sözleşme şartlarını kabul etmiş olursunuz.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-success" id="confirmApprove">
+                    <i class="fas fa-check me-1"></i>Onayla
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.empty-state {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.alert {
+    border: none;
+    border-radius: 8px;
+}
+</style>
+
+<script>
+let currentContractId = null;
+
+function approveContract(contractId) {
+    currentContractId = contractId;
+    const modal = new bootstrap.Modal(document.getElementById('approveModal'));
+    modal.show();
+}
+
+// Onay butonuna tıklandığında
+document.getElementById('confirmApprove')?.addEventListener('click', function() {
+    if (!currentContractId) return;
+
+    // Onay işlemini gerçekleştir
+    fetch(`/${currentContractId}/approve/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: ''
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Modal'ı kapat ve sayfayı yenile
+            bootstrap.Modal.getInstance(document.getElementById('approveModal')).hide();
+            location.reload();
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Approval error:', error);
+        alert('Onay işlemi sırasında bir hata oluştu.');
+    });
+});
+</script>
+{% endblock %}

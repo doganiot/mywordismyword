@@ -115,6 +115,27 @@ class Contract(models.Model):
             return True
         return False
 
+    @property
+    def is_locked(self):
+        """Sözleşme kilitli mi kontrolü (tamamlandıktan sonra asla değiştirilemez)"""
+        return self.status in ['completed', 'signed', 'approved']
+
+    @property
+    def can_be_deleted(self):
+        """Sözleşme silinebilir mi kontrolü"""
+        # Sadece taslak durumunda ve hiç imza/onay yoksa silinebilir
+        return (self.status == 'draft' and
+                self.signed_parties == 0 and
+                self.approved_parties == 0 and
+                not self.system_approved)
+
+    def check_integrity(self):
+        """Sözleşme bütünlüğünü kontrol et"""
+        if self.is_locked:
+            # Tamamlanan sözleşmeler asla değiştirilemez
+            raise ValueError("Bu sözleşme tamamlandıktan sonra değiştirilemez veya silinemez.")
+        return True
+
 
 class ContractParty(models.Model):
     """Sözleşme tarafları"""
@@ -125,8 +146,12 @@ class ContractParty(models.Model):
     ]
 
     contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='parties', verbose_name="Sözleşme")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contract_parties', verbose_name="Kullanıcı")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='contract_parties', verbose_name="Kullanıcı")
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='party', verbose_name="Rol")
+
+    # Manuel giriş için alanlar
+    name = models.CharField(max_length=100, blank=True, null=True, verbose_name="Ad Soyad")
+    email = models.EmailField(blank=True, null=True, verbose_name="E-posta")
 
     INVITATION_STATUS_CHOICES = [
         ('pending', 'Davet Gönderildi'),
@@ -145,17 +170,39 @@ class ContractParty(models.Model):
         unique_together = ['contract', 'user']
 
     def __str__(self):
-        return f"{self.user.get_full_name() or self.user.username} - {self.contract.title}"
+        display_name = self.name if self.name else (self.user.get_full_name() or self.user.username if self.user else "Bilinmeyen")
+        return f"{display_name} - {self.contract.title}"
 
     @property
-    def name(self):
-        """Kullanıcının tam adını döndürür"""
-        return self.user.get_full_name() or self.user.username
+    def display_name(self):
+        """Görüntülenecek adı döndürür"""
+        if self.user:
+            return self.user.get_full_name() or self.user.username
+        return self.name or "Bilinmeyen"
 
     @property
-    def email(self):
-        """Kullanıcının e-posta adresini döndürür"""
-        return self.user.email
+    def display_email(self):
+        """Görüntülenecek e-postayı döndürür"""
+        if self.user:
+            return self.user.email
+        return self.email or ""
+
+    @property
+    def can_be_removed(self):
+        """Bu taraf sözleşmeden çıkarılabilir mi kontrolü"""
+        # Sözleşme kilitliyse hiçbir taraf çıkarılamaz
+        if self.contract.is_locked:
+            return False
+        # Sözleşme taslaktaysa ve taraf henüz imza atmadıysa çıkarılabilir
+        return (self.contract.status == 'draft' and
+                not self.signatures.filter(is_signed=True).exists() and
+                not self.approvals.filter(is_approved=True).exists())
+
+    def check_removal_integrity(self):
+        """Taraf çıkarma bütünlüğünü kontrol et"""
+        if not self.can_be_removed:
+            raise ValueError("Bu taraf sözleşmeden çıkarılamaz. Sözleşme tamamlandıktan sonra taraflar değiştirilemez.")
+        return True
 
 
 class ContractSignature(models.Model):

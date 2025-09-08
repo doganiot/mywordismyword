@@ -16,11 +16,7 @@
                         {{ contract.title }}
                     </h3>
                     <div>
-                        <span class="badge fs-6
-                            {% if contract.status == 'completed' %}bg-success
-                            {% elif contract.status == 'signed' %}bg-info
-                            {% elif contract.status == 'approved' %}bg-warning
-                            {% else %}bg-secondary{% endif %}">
+                        <span class="badge fs-6 {% if contract.status == 'completed' %}bg-success{% elif contract.status == 'signed' %}bg-info{% elif contract.status == 'approved' %}bg-warning{% else %}bg-secondary{% endif %}">
                             {{ contract.get_status_display }}
                         </span>
                         {% if contract.visibility == 'public' %}
@@ -73,8 +69,8 @@
                                     <div class="party-card border rounded p-3">
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div>
-                                                <h6 class="mb-1">{{ party.name }}</h6>
-                                                <small class="text-muted">{{ party.email }}</small>
+                                                <h6 class="mb-1">{{ party.display_name }}</h6>
+                                                <small class="text-muted">{{ party.display_email }}</small>
                                                 <br>
                                                 <span class="badge bg-light text-dark mt-1">
                                                     {{ party.get_role_display }}
@@ -133,30 +129,46 @@
                         </div>
                         <div class="card-body">
                             {% for party in parties %}
-                                <div class="signature-item d-flex justify-content-between align-items-center mb-3 p-3 border rounded">
-                                    <div class="party-info">
-                                        <div class="fw-bold">{{ party.name }}</div>
-                                        <small class="text-muted">{{ party.email }}</small>
-                                        <div class="mt-1">
-                                            <span class="badge bg-light text-dark">
-                                                <i class="fas fa-user-tag"></i> {{ party.get_role_display }}
-                                            </span>
-                                            {% if party.invitation_status == 'pending' %}
-                                                <span class="badge bg-warning">
-                                                    <i class="fas fa-envelope"></i> Davet Gönderildi
-                                                </span>
-                                            {% elif party.invitation_status == 'accepted' %}
-                                                <span class="badge bg-success">
-                                                    <i class="fas fa-check"></i> Katıldı
-                                                </span>
-                                            {% elif party.invitation_status == 'declined' %}
-                                                <span class="badge bg-danger">
-                                                    <i class="fas fa-times"></i> Reddedildi
-                                                </span>
+                                <div class="signature-item d-flex justify-content-between align-items-start mb-3 p-3 border rounded">
+                                    <div class="party-info flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold">{{ party.display_name }}</div>
+                                                <small class="text-muted">{{ party.display_email }}</small>
+                                                <div class="mt-1">
+                                                    <span class="badge bg-light text-dark">
+                                                        <i class="fas fa-user-tag"></i> {{ party.get_role_display }}
+                                                    </span>
+                                                    {% if party.invitation_status == 'pending' %}
+                                                        <span class="badge bg-warning">
+                                                            <i class="fas fa-envelope"></i> Davet Gönderildi
+                                                        </span>
+                                                    {% elif party.invitation_status == 'accepted' %}
+                                                        <span class="badge bg-success">
+                                                            <i class="fas fa-check"></i> Katıldı
+                                                        </span>
+                                                    {% elif party.invitation_status == 'declined' %}
+                                                        <span class="badge bg-danger">
+                                                            <i class="fas fa-times"></i> Reddedildi
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            <!-- Taraf Çıkarma Butonu -->
+                                            {% if user.is_authenticated and contract.creator == user and party.can_be_removed %}
+                                                <form method="post" action="{% url 'contracts:remove_contract_party' pk=contract.pk party_id=party.id %}"
+                                                      onsubmit="return confirm('{{ party.display_name }} kullanıcısını sözleşmeden çıkarmak istediğinizden emin misiniz?')"
+                                                      class="ms-2">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                            title="Tarafı çıkar">
+                                                        <i class="fas fa-user-minus"></i>
+                                                    </button>
+                                                </form>
                                             {% endif %}
                                         </div>
                                     </div>
-                                    <div class="signature-status">
+                                    <div class="signature-status ms-3">
                                         {% with signature=party.signatures.first %}
                                             {% if signature and signature.is_signed %}
                                                 <div class="text-center">
@@ -269,16 +281,40 @@
                     <h6 class="mb-0">İşlemler</h6>
                 </div>
                 <div class="card-body d-grid gap-2">
+                    <!-- Sözleşme Güvenlik Uyarıları -->
+                    {% if contract.is_locked %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-lock me-2"></i>
+                            <strong>Güvenli Sözleşme:</strong> Bu sözleşme {{ contract.get_status_display|lower }} durumda olduğu için artık değiştirilemez ve silinemez.
+                        </div>
+                    {% elif contract.status == 'draft' and contract.can_be_deleted %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Taslak Sözleşme:</strong> Bu sözleşme henüz taslak aşamasında. İmzalandıktan veya onaylandıktan sonra asla değiştirilemez.
+                        </div>
+                    {% endif %}
+
+                    <!-- Düzenleme Butonu -->
                     {% if user.is_authenticated and contract.creator == user and contract.is_editable %}
                         <a href="{% url 'contracts:contract_edit' pk=contract.pk %}" class="btn btn-outline-primary">
                             <i class="fas fa-edit me-1"></i> Düzenle
                         </a>
                     {% endif %}
 
+                    <!-- Silme Butonu -->
+                    {% if user.is_authenticated and contract.creator == user and contract.can_be_deleted %}
+                        <a href="{% url 'contracts:contract_delete' pk=contract.pk %}" class="btn btn-outline-danger"
+                           onclick="return confirm('Bu sözleşmeyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')">
+                            <i class="fas fa-trash me-1"></i> Sözleşmeyi Sil
+                        </a>
+                    {% endif %}
+
+                    <!-- PDF İndirme -->
                     <a href="{% url 'contracts:contract_pdf' pk=contract.pk %}" class="btn btn-outline-success">
                         <i class="fas fa-download me-1"></i> PDF İndir
                     </a>
 
+                    <!-- İmzalama Butonu -->
                     {% if user_party and user_party.signatures.exists and not user_party.signatures.first.is_signed %}
                         <a href="{% url 'contracts:contract_sign' pk=contract.pk %}" class="btn btn-primary">
                             <i class="fas fa-signature me-1"></i> İmzala
@@ -358,23 +394,71 @@
 
 <!-- Taraf Ekleme Modal -->
 <div class="modal fade" id="addPartyModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Taraf Ekle</h5>
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus me-2"></i>Taraf Ekle
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <!-- Kullanıcı Arama Sekmesi -->
+                <ul class="nav nav-tabs" id="partyTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="search-tab" data-bs-toggle="tab" data-bs-target="#search" type="button" role="tab">
+                            <i class="fas fa-search me-1"></i>Kayıtlı Kullanıcı Ara
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">
+                            <i class="fas fa-edit me-1"></i>Manuel Giriş
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content mt-3" id="partyTabContent">
+                    <!-- Kayıtlı Kullanıcı Arama -->
+                    <div class="tab-pane fade show active" id="search" role="tabpanel">
+                        <div class="mb-3">
+                            <label for="userSearch" class="form-label">Kullanıcı Ara</label>
+                            <input type="text" class="form-control" id="userSearch" placeholder="Ad soyad veya e-posta ile ara...">
+                            <div class="form-text">Sistemde kayıtlı kullanıcıları arayın</div>
+                        </div>
+                        <div id="userResults" class="mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div class="text-muted small">Arama yapmak için yazmaya başlayın...</div>
+                        </div>
+                    </div>
+
+                    <!-- Manuel Giriş -->
+                    <div class="tab-pane fade" id="manual" role="tabpanel">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Sistemde kayıtlı olmayan kullanıcı için manuel giriş yapın.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ortak Form Alanları -->
                 <form id="addPartyForm">
                     {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="partyName" class="form-label">Ad Soyad</label>
-                        <input type="text" class="form-control" id="partyName" name="name" required>
+                    <input type="hidden" id="selectedUserId" name="user_id" value="">
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="partyName" class="form-label">Ad Soyad</label>
+                                <input type="text" class="form-control" id="partyName" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="partyEmail" class="form-label">E-posta</label>
+                                <input type="email" class="form-control" id="partyEmail" name="email" required>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="partyEmail" class="form-label">E-posta</label>
-                        <input type="email" class="form-control" id="partyEmail" name="email" required>
-                    </div>
+
                     <div class="mb-3">
                         <label for="partyRole" class="form-label">Rol</label>
                         <select class="form-control" id="partyRole" name="role">
@@ -383,7 +467,15 @@
                             <option value="approver">Onaylayan</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Ekle</button>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>Taraf Ekle
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>İptal
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -477,6 +569,110 @@ function copyLink() {
         alert('Link kopyalandı!');
     });
 }
+
+// Kullanıcı Arama Fonksiyonu
+let searchTimeout = null;
+document.getElementById('userSearch')?.addEventListener('input', function() {
+    const query = this.value.trim();
+    const resultsDiv = document.getElementById('userResults');
+
+    if (query.length < 2) {
+        resultsDiv.innerHTML = '<div class="text-muted small">Arama yapmak için en az 2 karakter yazın...</div>';
+        return;
+    }
+
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        searchUsers(query);
+    }, 300);
+});
+
+function searchUsers(query) {
+    const resultsDiv = document.getElementById('userResults');
+    resultsDiv.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> <span>Aranıyor...</span></div>';
+
+    fetch(`/api/search-users/?q=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayUserResults(data.users);
+        } else {
+            resultsDiv.innerHTML = '<div class="text-danger small">Arama sırasında hata oluştu.</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        resultsDiv.innerHTML = '<div class="text-danger small">Bağlantı hatası.</div>';
+    });
+}
+
+function displayUserResults(users) {
+    const resultsDiv = document.getElementById('userResults');
+
+    if (users.length === 0) {
+        resultsDiv.innerHTML = '<div class="text-muted small">Kullanıcı bulunamadı. Manuel giriş yapabilirsiniz.</div>';
+        return;
+    }
+
+    let html = '<div class="list-group">';
+    users.forEach(user => {
+        html += `
+            <button type="button" class="list-group-item list-group-item-action p-2" onclick="selectUser(${user.id}, '${user.full_name}', '${user.email}')">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${user.full_name}</strong>
+                        <br><small class="text-muted">${user.email}</small>
+                    </div>
+                    <i class="fas fa-chevron-right text-primary"></i>
+                </div>
+            </button>
+        `;
+    });
+    html += '</div>';
+
+    resultsDiv.innerHTML = html;
+}
+
+function selectUser(userId, fullName, email) {
+    // Form alanlarını doldur
+    document.getElementById('selectedUserId').value = userId;
+    document.getElementById('partyName').value = fullName;
+    document.getElementById('partyEmail').value = email;
+
+    // Arama sonuçlarını temizle
+    document.getElementById('userResults').innerHTML = `
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle me-1"></i>
+            <strong>${fullName}</strong> seçildi. Formu doldurup "Taraf Ekle" butonuna tıklayın.
+        </div>
+    `;
+
+    // Arama kutusunu temizle
+    document.getElementById('userSearch').value = '';
+
+    // Sekmeyi manuel girişe geçir
+    const manualTab = new bootstrap.Tab(document.getElementById('manual-tab'));
+    manualTab.show();
+}
+
+// Modal açıldığında formu sıfırla
+document.getElementById('addPartyModal')?.addEventListener('show.bs.modal', function() {
+    // Form alanlarını temizle
+    document.getElementById('selectedUserId').value = '';
+    document.getElementById('partyName').value = '';
+    document.getElementById('partyEmail').value = '';
+    document.getElementById('userSearch').value = '';
+    document.getElementById('userResults').innerHTML = '<div class="text-muted small">Arama yapmak için yazmaya başlayın...</div>';
+
+    // İlk sekmeye geç
+    const searchTab = new bootstrap.Tab(document.getElementById('search-tab'));
+    searchTab.show();
+});
 
 document.getElementById('addPartyForm')?.addEventListener('submit', function(e) {
     e.preventDefault();

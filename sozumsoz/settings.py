@@ -210,12 +210,19 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your-email@gmail.com'
-EMAIL_HOST_PASSWORD = 'your-app-password'
+# Development için console backend kullanıyoruz (e-postalar terminal'de görünür)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Default sender email
+DEFAULT_FROM_EMAIL = 'noreply@sozumsoz.com'
+
+# Production için aşağıdaki ayarları kullanabilirsiniz:
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'your-app-password'
 
 # Media files
 MEDIA_URL = '/media/'

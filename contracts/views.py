@@ -242,6 +242,13 @@ def contract_edit(request, pk):
     """Sözleşme düzenleme"""
     contract = get_object_or_404(Contract, pk=pk, creator=request.user)
 
+    # Sözleşme bütünlüğünü kontrol et
+    try:
+        contract.check_integrity()
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect('contracts:contract_detail', pk=pk)
+
     if not contract.is_editable:
         messages.error(request, 'Bu sözleşme artık düzenlenemez.')
         return redirect('contracts:contract_detail', pk=pk)
@@ -258,6 +265,55 @@ def contract_edit(request, pk):
     return render(request, 'contracts/contract_edit.html', {
         'contract': contract
     })
+
+
+@login_required
+def contract_delete(request, pk):
+    """Sözleşme silme"""
+    contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+
+    # Sözleşme silinebilir mi kontrolü
+    if not contract.can_be_deleted:
+        messages.error(request, 'Bu sözleşme silinemez. Sözleşme tamamlandıktan veya imzalandıktan sonra asla silinemez.')
+        return redirect('contracts:contract_detail', pk=pk)
+
+    if request.method == 'POST':
+        try:
+            contract_title = contract.title
+            contract.delete()
+            messages.success(request, f'"{contract_title}" sözleşmesi başarıyla silindi.')
+            return redirect('contracts:my_contracts')
+        except Exception as e:
+            messages.error(request, f'Sözleşme silinirken bir hata oluştu: {str(e)}')
+            return redirect('contracts:contract_detail', pk=pk)
+
+    return render(request, 'contracts/contract_confirm_delete.html', {
+        'contract': contract
+    })
+
+
+@login_required
+def remove_contract_party(request, pk, party_id):
+    """Sözleşmeden taraf çıkarma"""
+    contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    party = get_object_or_404(ContractParty, id=party_id, contract=contract)
+
+    # Taraf çıkarılabilir mi kontrolü
+    try:
+        party.check_removal_integrity()
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect('contracts:contract_detail', pk=pk)
+
+    if request.method == 'POST':
+        try:
+            party_name = party.display_name
+            party.delete()
+            messages.success(request, f'"{party_name}" sözleşmeden çıkarıldı.')
+        except Exception as e:
+            messages.error(request, f'Taraf çıkarılırken bir hata oluştu: {str(e)}')
+
+    return redirect('contracts:contract_detail', pk=pk)
 
 
 @login_required
@@ -368,8 +424,55 @@ def signed_contracts(request):
         signatures__is_signed=True
     ).distinct().order_by('-created_at')
 
+    # Her sözleşme için kullanıcının imza bilgisini ekle
+    contracts_with_signatures = []
+    for contract in signed_contracts:
+        user_signature = contract.signatures.filter(
+            user=request.user,
+            is_signed=True
+        ).first()
+        contract.user_signature = user_signature
+        contracts_with_signatures.append(contract)
+
     return render(request, 'contracts/signed_contracts.html', {
-        'contracts': signed_contracts
+        'contracts': contracts_with_signatures
+    })
+
+
+@login_required
+def invited_contracts(request):
+    """Kullanıcının davet edildiği sözleşmeler"""
+    # Kullanıcının davet edildiği sözleşmeleri al
+    invited_parties = ContractParty.objects.filter(
+        user=request.user,
+        invitation_status__in=['pending', 'accepted']
+    ).select_related('contract', 'contract__creator')
+
+    invited_contracts = []
+    for party in invited_parties:
+        contract = party.contract
+
+        # Sözleşmenin durumunu belirle
+        user_signature = contract.signatures.filter(user=request.user).first()
+        user_approval = contract.approvals.filter(user=request.user).first()
+
+        contract.invitation_status = party.invitation_status
+        contract.user_party_role = party.get_role_display()
+        contract.user_signature = user_signature
+        contract.user_approval = user_approval
+        contract.can_sign = user_signature and not user_signature.is_signed
+        contract.can_approve = not user_approval or not user_approval.is_approved
+
+        invited_contracts.append(contract)
+
+    # Oluşturulma tarihine göre sırala
+    invited_contracts.sort(key=lambda x: x.created_at, reverse=True)
+
+    return render(request, 'contracts/invited_contracts.html', {
+        'contracts': invited_contracts,
+        'total_invited': len(invited_contracts),
+        'pending_count': len([c for c in invited_contracts if c.invitation_status == 'pending']),
+        'accepted_count': len([c for c in invited_contracts if c.invitation_status == 'accepted'])
     })
 
 
@@ -398,35 +501,189 @@ def contract_pdf(request, pk):
     """Sözleşmeyi PDF olarak indir"""
     contract = get_object_or_404(Contract, pk=pk)
 
+    # Görünürlük kontrolü
+    if contract.visibility == 'private':
+        if not request.user.is_authenticated:
+            return HttpResponse('Unauthorized', status=401)
+
+        if (contract.creator != request.user and
+            not contract.parties.filter(user=request.user).exists()):
+            return HttpResponse('Forbidden', status=403)
+
     # PDF oluştur
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
 
-    # Başlık
-    title = Paragraph(contract.title, styles['Heading1'])
+    # Türkçe karakter desteği için font ayarları
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
+    from reportlab.lib.colors import black
+    import os
+
+    # Özel fontları yüklemeye çalış (varsa)
+    font_name = 'Helvetica'  # Default font
+    try:
+        # Arial Unicode MS veya benzer bir font varsa kullan
+        font_paths = [
+            os.path.join(os.path.dirname(__file__), 'fonts', 'arial.ttf'),
+            os.path.join(os.path.dirname(__file__), 'fonts', 'arial_unicode.ttf'),
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Linux
+            '/System/Library/Fonts/Arial.ttf',  # macOS
+            'C:/Windows/Fonts/arial.ttf',  # Windows
+        ]
+
+        for font_path in font_paths:
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('TurkishFont', font_path))
+                font_name = 'TurkishFont'
+                print(f"Türkçe font yüklendi: {font_path}")
+                break
+    except Exception as e:
+        print(f"Font yükleme hatası: {e}")
+        font_name = 'Helvetica'
+
+    # Özel stiller oluştur (Türkçe karakter desteği için)
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontName=font_name,
+        fontSize=18,
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        textColor=black,
+        encoding='utf-8',
+        allowOrphans=1,
+        allowWidows=1
+    )
+
+    content_style = ParagraphStyle(
+        'CustomContent',
+        parent=styles['Normal'],
+        fontName=font_name,
+        fontSize=12,
+        spaceAfter=12,
+        alignment=TA_LEFT,
+        textColor=black,
+        encoding='utf-8',
+        allowOrphans=1,
+        allowWidows=1
+    )
+
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontName=font_name,
+        fontSize=14,
+        spaceAfter=10,
+        alignment=TA_LEFT,
+        textColor=black,
+        encoding='utf-8',
+        allowOrphans=1,
+        allowWidows=1
+    )
+
+    # Türkçe karakterleri güvenli hale getirme fonksiyonu
+    def safe_text(text):
+        """Türkçe karakterleri güvenli hale getirir"""
+        if not text:
+            return ""
+
+        # Önce string'e dönüştür
+        text = str(text)
+
+        # UTF-8 encoding/decoding ile temizle
+        try:
+            # Unicode normalize et
+            import unicodedata
+            text = unicodedata.normalize('NFC', text)
+            return text.encode('utf-8').decode('utf-8')
+        except (UnicodeDecodeError, UnicodeEncodeError, UnicodeError):
+            # Eğer UTF-8 hatası olursa alternatif yöntemler dene
+            try:
+                return text.encode('latin1').decode('utf-8')
+            except:
+                try:
+                    return text.encode('cp1254').decode('utf-8')
+                except:
+                    # Son çare: ASCII'ye dönüştür
+                    return text.encode('ascii', 'ignore').decode('ascii')
+
+    # Başlık - Türkçe karakter desteği ile
+    title_text = safe_text(contract.title)
+    title = Paragraph(title_text, title_style)
     story.append(title)
     story.append(Spacer(1, 12))
 
-    # İçerik
-    content = Paragraph(contract.content.replace('\n', '<br/>'), styles['Normal'])
+    # İçerik - Türkçe karakter desteği ile
+    content_text = safe_text(contract.content.replace('\n', '<br/>'))
+    content = Paragraph(content_text, content_style)
     story.append(content)
     story.append(Spacer(1, 12))
 
-    # Taraflar
-    parties_title = Paragraph("Taraflar:", styles['Heading2'])
+    # Taraflar başlığı
+    parties_title = Paragraph("Taraflar:", heading_style)
     story.append(parties_title)
 
+    # Taraflar listesi
     for party in contract.parties.all():
-        party_text = f"- {party.name} ({party.email})"
-        story.append(Paragraph(party_text, styles['Normal']))
+        if party.user:
+            party_name = party.user.get_full_name() or party.user.username
+            party_email = party.user.email
+        else:
+            party_name = party.name or "İsimsiz"
+            party_email = party.email or ""
 
-    doc.build(story)
+        # Türkçe karakter desteği ile
+        party_text = safe_text(f"- {party_name} ({party_email})")
+        story.append(Paragraph(party_text, content_style))
+
+    # İmzalar bölümü
+    story.append(Spacer(1, 20))
+    signatures_title = Paragraph("İmzalar:", heading_style)
+    story.append(signatures_title)
+
+    for party in contract.parties.all():
+        if party.user:
+            party_name = party.user.get_full_name() or party.user.username
+        else:
+            party_name = party.name or "İsimsiz"
+
+        signature_text = safe_text(f"_______________________________<br/><b>{party_name}</b>")
+        story.append(Paragraph(signature_text, content_style))
+        story.append(Spacer(1, 30))
+
+    # PDF oluşturma işlemi
+    try:
+        doc.build(story)
+    except Exception as pdf_error:
+        print(f"PDF oluşturma hatası: {pdf_error}")
+        # Hata durumunda basit bir PDF oluştur
+        from reportlab.platypus import SimpleDocTemplate as SimpleDocTemplateFallback
+        buffer = BytesIO()
+        doc = SimpleDocTemplateFallback(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Basit hata mesajı
+        error_msg = "PDF oluşturulurken bir hata oluştu. Lütfen sayfayı yenileyip tekrar deneyin."
+        story.append(Paragraph(error_msg, styles['Normal']))
+        doc.build(story)
 
     buffer.seek(0)
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{contract.title}.pdf"'
+
+    # Dosya adını Türkçe karakter sorunu olmadan ayarla
+    safe_filename = safe_text(contract.title)
+    # Dosya adı için güvenli karakterlere dönüştür
+    import re
+    safe_filename = re.sub(r'[^\w\-_\.]', '_', safe_filename)
+    safe_filename = safe_filename[:100]  # Dosya adı çok uzun olmasın
+
+    response['Content-Disposition'] = f'attachment; filename="{safe_filename}.pdf"'
     return response
 
 
@@ -581,22 +838,49 @@ def add_contract_party(request, pk):
         name = request.POST.get('name')
         email = request.POST.get('email')
         role = request.POST.get('role', 'party')
+        user_id = request.POST.get('user_id')
 
-        # Kullanıcı varsa bağla, yoksa None bırak
+        # Kullanıcı varsa bağla
         user = None
-        try:
-            from django.contrib.auth.models import User
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            pass
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+                # Seçilen kullanıcının bilgilerini kullan
+                name = user.get_full_name() or user.username
+                email = user.email
+            except User.DoesNotExist:
+                pass
+        else:
+            # Manuel giriş - e-posta ile kullanıcı ara
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                pass
 
-        party = ContractParty.objects.create(
-            contract=contract,
-            user=user,
-            email=email,
-            name=name,
-            role=role
-        )
+        # Bu sözleşmede bu kullanıcı zaten taraf mı kontrol et
+        if user and ContractParty.objects.filter(contract=contract, user=user).exists():
+            return JsonResponse({
+                'success': False,
+                'message': 'Bu kullanıcı zaten sözleşmenin tarafı.'
+            })
+
+        # ContractParty oluşturma
+        if user:
+            # Sistem kullanıcısı varsa
+            party = ContractParty.objects.create(
+                contract=contract,
+                user=user,
+                role=role
+            )
+        else:
+            # Manuel giriş ise
+            party = ContractParty.objects.create(
+                contract=contract,
+                user=None,
+                name=name,
+                email=email,
+                role=role
+            )
 
         # Bildirim gönder
         try:
@@ -640,6 +924,41 @@ def add_contract_party(request, pk):
             'success': True,
             'message': 'Taraf eklendi ve davet gönderildi!',
             'invitation_sent': True
+        })
+
+        return JsonResponse({'success': False, 'message': 'Geçersiz istek.'})
+
+
+@login_required
+def search_users(request):
+    """Kullanıcıları ad soyad veya e-posta ile ara"""
+    if request.method == 'GET':
+        query = request.GET.get('q', '').strip()
+
+        if len(query) < 2:
+            return JsonResponse({'success': False, 'message': 'Arama sorgusu çok kısa.'})
+
+        # Kullanıcıları ara (ad soyad veya e-posta ile)
+        users = User.objects.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query) |
+            Q(username__icontains=query)
+        ).exclude(id=request.user.id).distinct()[:10]  # Kendisini hariç tut, max 10 sonuç
+
+        user_list = []
+        for user in users:
+            user_list.append({
+                'id': user.id,
+                'full_name': user.get_full_name() or user.username,
+                'email': user.email,
+                'username': user.username
+            })
+
+        return JsonResponse({
+            'success': True,
+            'users': user_list,
+            'count': len(user_list)
         })
 
     return JsonResponse({'success': False, 'message': 'Geçersiz istek.'})

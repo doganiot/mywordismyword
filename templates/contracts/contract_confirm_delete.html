@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sözleşmeyi Sil - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Sözleşmeyi Silmek İstediğinizden Emin misiniz?
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Dikkat:</strong> Bu işlem geri alınamaz!
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Silinecek Sözleşme:</h5>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ contract.title }}</h6>
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <small class="text-muted">Oluşturan</small>
+                                        <div>{{ contract.creator.get_full_name|default:contract.creator.username }}</div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <small class="text-muted">Oluşturulma Tarihi</small>
+                                        <div>{{ contract.created_at|date:"d.m.Y H:i" }}</div>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">Durum</small>
+                                    <div>
+                                        <span class="badge {% if contract.status == 'completed' %}bg-success{% elif contract.status == 'signed' %}bg-info{% elif contract.status == 'approved' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ contract.get_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Sözleşme Tarafları:</h6>
+                        <ul class="list-group list-group-flush">
+                            {% for party in contract.parties.all %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ party.display_name }}
+                                    <span class="badge bg-light text-dark">{{ party.get_role_display }}</span>
+                                </li>
+                            {% empty %}
+                                <li class="list-group-item text-muted">Henüz taraf eklenmemiş</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    {% if not contract.can_be_deleted %}
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-lock me-2"></i>Bu Sözleşme Silinemez!</h6>
+                            <p class="mb-0">
+                                Sözleşme {% if contract.status == 'completed' %}tamamlandıktan{% elif contract.status == 'signed' %}imzalandıktan{% elif contract.status == 'approved' %}onaylandıktan{% endif %} sonra asla silinemez.
+                            </p>
+                        </div>
+                    {% else %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-danger flex-fill">
+                                    <i class="fas fa-trash me-1"></i>
+                                    Evet, Sözleşmeyi Sil
+                                </button>
+                                <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="btn btn-secondary flex-fill">
+                                    <i class="fas fa-times me-1"></i>
+                                    İptal Et
+                                </a>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+
+                <div class="card-footer">
+                    <small class="text-muted">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        SözümSöz platformunda sözleşme güvenliği en yüksek önceliğimizdir.
+                        {% if contract.can_be_deleted %}
+                            Bu sözleşme henüz taslak aşamasında olduğu için silinebilir.
+                        {% else %}
+                            Tamamlanan sözleşmeler kalıcı olarak korunur ve asla değiştirilemez.
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.alert {
+    border-radius: 8px;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.list-group-item {
+    border: none;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+</style>
+{% endblock %}

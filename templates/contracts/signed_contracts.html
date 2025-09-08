@@ -52,14 +52,14 @@
                                         </div>
 
                                         <!-- İmza Bilgisi -->
-                                        {% with user_signature=contract.signatures.get(user=request.user) %}
+                                        {% if contract.user_signature %}
                                             <div class="alert alert-success py-2 mb-2">
                                                 <small>
                                                     <i class="fas fa-check-circle me-1"></i>
-                                                    {{ user_signature.signed_at|date:"d.m.Y H:i" }} tarihinde imzalandı
+                                                    {{ contract.user_signature.signed_at|date:"d.m.Y H:i" }} tarihinde imzalandı
                                                 </small>
                                             </div>
-                                        {% endwith %}
+                                        {% endif %}
 
                                         <!-- Durum Badge'i -->
                                         <div class="mt-2">
