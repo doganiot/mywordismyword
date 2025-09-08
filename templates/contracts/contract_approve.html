@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ contract.title }} - Onayla - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow-lg">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-thumbs-up me-2"></i>
+                        Sözleşmeyi Onayla
+                    </h4>
+                </div>
+
+                <div class="card-body p-4 text-center">
+                    <!-- Sözleşme Özeti -->
+                    <h5 class="fw-bold mb-3">{{ contract.title }}</h5>
+                    <p class="text-muted mb-4">
+                        {{ contract.creator.get_full_name|default:contract.creator.username }} tarafından oluşturuldu<br>
+                        <small>{{ contract.created_at|date:"d.m.Y H:i" }}</small>
+                    </p>
+
+                    <!-- Sözleşme İçeriği Özeti -->
+                    <div class="contract-preview border rounded p-3 mb-4 bg-light">
+                        <p class="text-muted mb-2"><strong>İçerik Özeti:</strong></p>
+                        <p class="small">{{ contract.content|truncatechars:200 }}</p>
+                    </div>
+
+                    <!-- İstatistikler -->
+                    <div class="row mb-4">
+                        <div class="col-4">
+                            <div class="stat-item">
+                                <h4 class="text-primary">{{ contract.parties.count }}</h4>
+                                <small class="text-muted">Taraf</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-item">
+                                <h4 class="text-success">{{ contract.signed_parties }}</h4>
+                                <small class="text-muted">İmza</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-item">
+                                <h4 class="text-info">{{ contract.approved_parties }}</h4>
+                                <small class="text-muted">Onay</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if user_has_approved %}
+                        <!-- Zaten Onaylanmış -->
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Bu sözleşmeyi zaten onayladınız.
+                        </div>
+
+                        <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="btn btn-primary">
+                            <i class="fas fa-eye me-2"></i>
+                            Sözleşmeyi Görüntüle
+                        </a>
+                    {% else %}
+                        <!-- Onay Formu -->
+                        <form method="post">
+                            {% csrf_token %}
+
+                            <div class="alert alert-info mb-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Bilgi:</strong> Sözleşmeyi onayladığınızda bu işlem geri alınamaz.
+                                Sözleşmenin içeriğini dikkatlice okuyun.
+                            </div>
+
+                            <button type="submit" class="btn btn-success btn-lg px-5">
+                                <i class="fas fa-thumbs-up me-2"></i>
+                                Sözleşmeyi Onayla
+                            </button>
+
+                            <div class="mt-3">
+                                <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>
+                                    Geri Dön
+                                </a>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.contract-preview {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.stat-item {
+    padding: 1rem 0;
+}
+
+.stat-item h4 {
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .card {
+        margin: 0 1rem;
+    }
+
+    .row.mb-4 .col-4 {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}

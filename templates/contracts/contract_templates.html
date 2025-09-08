@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sözleşme Şablonları - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <!-- Başlık -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="fas fa-magic me-3"></i>
+                    Sözleşme Şablonları
+                </h1>
+                <p class="lead text-muted">
+                    Hazır şablonlarla sözleşme oluşturma sürecinizi hızlandırın
+                </p>
+            </div>
+
+            <!-- Şablonlar -->
+            {% if templates %}
+                <div class="row g-4">
+                    {% for template in templates %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 border-0 shadow-sm hover-lift">
+                                <div class="card-body d-flex flex-column">
+                                    <!-- Şablon Başlığı -->
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="template-icon me-3">
+                                            {% if template.template_type == 'friendship' %}
+                                                <i class="fas fa-heart text-danger"></i>
+                                            {% elif template.template_type == 'meeting' %}
+                                                <i class="fas fa-calendar text-info"></i>
+                                            {% elif template.template_type == 'sports' %}
+                                                <i class="fas fa-futbol text-success"></i>
+                                            {% elif template.template_type == 'relationship' %}
+                                                <i class="fas fa-heart text-warning"></i>
+                                            {% elif template.template_type == 'travel' %}
+                                                <i class="fas fa-plane text-primary"></i>
+                                            {% elif template.template_type == 'diet' %}
+                                                <i class="fas fa-apple-alt text-success"></i>
+                                            {% elif template.template_type == 'study' %}
+                                                <i class="fas fa-book text-info"></i>
+                                            {% elif template.template_type == 'cooking' %}
+                                                <i class="fas fa-utensils text-warning"></i>
+                                            {% elif template.template_type == 'household' %}
+                                                <i class="fas fa-home text-secondary"></i>
+                                            {% elif template.template_type == 'delivery' %}
+                                                <i class="fas fa-truck text-primary"></i>
+                                            {% else %}
+                                                <i class="fas fa-file-contract text-muted"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <h5 class="card-title fw-bold mb-1">{{ template.title }}</h5>
+                                            <span class="badge bg-primary">{{ template.get_template_type_display }}</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Şablon Açıklaması -->
+                                    <p class="card-text text-muted flex-grow-1">
+                                        {{ template.description }}
+                                    </p>
+
+                                    <!-- Aksiyon Butonları -->
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-outline-primary btn-sm flex-fill"
+                                                onclick="previewTemplate('{{ template.title }}', '{{ template.content|escapejs }}')">
+                                            <i class="fas fa-eye me-1"></i>Önizleme
+                                        </button>
+                                        <a href="{% url 'contracts:contract_create' %}?template={{ template.id }}"
+                                           class="btn btn-primary btn-sm flex-fill">
+                                            <i class="fas fa-plus me-1"></i>Kullan
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Boş Durum -->
+                <div class="text-center py-5">
+                    <div class="empty-state">
+                        <i class="fas fa-magic fa-4x text-muted mb-4"></i>
+                        <h3 class="text-muted">Şablon Bulunamadı</h3>
+                        <p class="text-muted mb-4">
+                            Henüz hiç sözleşme şablonu bulunmuyor.
+                        </p>
+                        <a href="{% url 'contracts:contract_create' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus me-2"></i>
+                            Boş Şablondan Başla
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Şablon Önizleme Modal -->
+<div class="modal fade" id="templatePreviewModal" tabindex="-1" aria-labelledby="templatePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="templatePreviewModalLabel">Şablon Önizleme</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="templatePreviewContent" class="border p-3 bg-light" style="white-space: pre-wrap; min-height: 300px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                <button type="button" class="btn btn-primary" id="useTemplateBtn">
+                    <i class="fas fa-plus me-1"></i>Bu Şablonu Kullan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.template-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.empty-state {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .d-flex.gap-2 {
+        flex-direction: column;
+    }
+
+    .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+
+{% block extra_js %}
+<script>
+let currentTemplateContent = '';
+
+function previewTemplate(title, content) {
+    document.getElementById('templatePreviewModalLabel').textContent = title + ' - Önizleme';
+    document.getElementById('templatePreviewContent').textContent = content;
+    currentTemplateContent = content;
+
+    const modal = new bootstrap.Modal(document.getElementById('templatePreviewModal'));
+    modal.show();
+}
+
+document.getElementById('useTemplateBtn')?.addEventListener('click', function() {
+    // Şablon içeriğini localStorage'a kaydet
+    localStorage.setItem('selectedTemplateContent', currentTemplateContent);
+
+    // Sözleşme oluşturma sayfasına yönlendir
+    window.location.href = "{% url 'contracts:contract_create' %}";
+});
+
+// Sayfa yüklendiğinde localStorage'dan şablonu yükle
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTemplate = localStorage.getItem('selectedTemplateContent');
+    if (savedTemplate && window.location.pathname.includes('contract_create')) {
+        const contentTextarea = document.getElementById('content');
+        if (contentTextarea && contentTextarea.value === '') {
+            contentTextarea.value = savedTemplate;
+            localStorage.removeItem('selectedTemplateContent'); // Temizle
+        }
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

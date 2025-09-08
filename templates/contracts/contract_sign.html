@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ contract.title }} - İmza - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow-lg">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-signature me-2"></i>
+                        Sözleşmeyi İmzala
+                    </h4>
+                </div>
+
+                <div class="card-body p-4">
+                    <!-- Sözleşme Özeti -->
+                    <div class="text-center mb-4">
+                        <h5 class="fw-bold">{{ contract.title }}</h5>
+                        <p class="text-muted">{{ contract.creator.get_full_name|default:contract.creator.username }} tarafından oluşturuldu</p>
+                    </div>
+
+                    {% if user_party.signatures.exists and user_party.signatures.first.is_signed %}
+                        <!-- Zaten İmzalanmış -->
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
+                            <h4 class="text-success">Sözleşme Zaten İmzalandı</h4>
+                            <p class="text-muted">
+                                Bu sözleşmeyi {{ user_party.signatures.first.signed_at|date:"d.m.Y H:i" }} tarihinde imzaladınız.
+                            </p>
+                            <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="btn btn-primary">
+                                <i class="fas fa-eye me-2"></i>
+                                Sözleşmeyi Görüntüle
+                            </a>
+                        </div>
+                    {% else %}
+                        <!-- İmza Formu -->
+                        <form method="post">
+                            {% csrf_token %}
+
+                            <div class="alert alert-info mb-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>İmza Kodu:</strong> Size e-posta ile gönderilen 6 haneli imza kodunu aşağıya girin.
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="signature_code" class="form-label fw-bold">
+                                    <i class="fas fa-key me-1"></i>
+                                    İmza Kodu *
+                                </label>
+                                <input type="text" class="form-control form-control-lg text-center"
+                                       id="signature_code" name="signature_code"
+                                       placeholder="000000" maxlength="6" required
+                                       pattern="[0-9]{6}" inputmode="numeric">
+                                <div class="form-text text-center">
+                                    6 haneli sayısal kod
+                                </div>
+                            </div>
+
+                            <div class="text-center mb-4">
+                                <button type="submit" class="btn btn-success btn-lg px-5">
+                                    <i class="fas fa-signature me-2"></i>
+                                    Sözleşmeyi İmzala
+                                </button>
+                            </div>
+
+                            <div class="text-center">
+                                <small class="text-muted">
+                                    İmza kodunuzu e-posta kutunuzda bulabilirsiniz.<br>
+                                    Kod gelmediyse spam klasörünü kontrol edin.
+                                </small>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const codeInput = document.getElementById('signature_code');
+
+    if (codeInput) {
+        // Sadece sayı girişi
+        codeInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '');
+        });
+
+        // Otomatik focus
+        codeInput.focus();
+    }
+});
+</script>
+{% endblock %}
+
+<style>
+@media (max-width: 768px) {
+    .card {
+        margin: 0 1rem;
+    }
+}
+</style>
+{% endblock %}

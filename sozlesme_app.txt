@@ -1,0 +1,51 @@
+Bir web uygulaması yapacağız.
+
+
+Temelde en basit anlatımla bu web site resmi olmayan sözleşmeler,taahhüt,sertifa ve beratlar üretecek.
+
+Kullanıcılar kayıt olacak ve sisteme dahil olacak, google. Facebook gibi hesaplarını kullanarak da kayıt olabilirler. 
+
+Eğlenceli ama bağlayıcı sözleşmeler.
+
+örnek olarak; iki arkadaş arasında yarın buluşma yeri ve saatini bildiren bir sözleşme, 
+halı sahada oynanacak maçın saatini ve yerini bildiren bir sözleşme, iki dost olduklarına dair bir sözleşme, iki sevgili olduklarına dair bir sözleşme, öğrencilerin en sevdikleri öğretmenin kim olduklarına dair berat, şehrin en nezih mekanın kim olduğunu belirten bir berat, internette en güvenilir telefon satısına ait verilen bir berat, arabayı gidileceği yere kadar kimin kullanacağı, hangi güzergahta süreceği gibi bilgilerin olduğu sözleşme, diyet sözleşmeleri, geleceğe dair plan sözleşmeleri, sınav testi sözleşmesi, akşama yemeği kimin yapacağı sözleşmesi, teslim tesellüm sözleşmeleri, çöpleri kimin atacağına dair, vb. sözleşmeler üretilebilecek.
+
+
+Kullanıcılar ürettikleri sözleşmeleri .pdf formatında indirebilirler .jpeg formatında istedikleri yerde paylaşabilirler.
+
+Sözleşmelerle içeriği düzenlenebilmeli ek maddeler yada bazı maddeler çıkarılabilmeli.
+
+Sözleşmeler onayladıktan sonra düzenlenemez.
+
+Sözleşmelerin bulunduğu bir havuz oluştur. Kullanıcılar sözleşmelerini halka açık olarak işaretlerse herkes sözleşmeyi bu havuzdan alıp inceleyebilir. Eğer sözleşme tarafların herhangi birisi tarafından gizli olarak işaretlenirse sadece admin ve taraflar sözleşmeyi görebilir.
+
+
+Belge güvenliği ve üretilmesi:
+Bir Sözleşme oluşturmak için en az 3 onay olmalı ilk iki kişi taraflar üçüncü kişi sistem ve belge üretici "mywordismyword" Bu ilk düzey güvenilirlik  ve sağlamlığı artırmak için sözleşmeye diğer kullanıcıların da dahil olması ve onay vermesiyle olur.
+
+Oluşturulan sözleşme onaylanabilmesi için taraf kişi imzala butonuna basar ve bir onay kutusu açılır, kendisine bir e-posta gönderilir,bu e-postada bir onay kodu bulunur, onay kodu açılan penceye doğru şekile girildikten sonra taraf kişi sözleşmeyi imzalamış olur.  Kendisine onaylanmış sözleşme e-posta olarak gönderilir.
+
+
+Tüm sözleşmeler "mywordismyword" tarafından onaylandıktan sonra geçerli olur.
+
+
+Kullanıcılar platforma üye olduktan sonra sözleşme ve berat üretebilirler.
+Kullanıcılar kendi sayfalarında ürettikleri sözleşmeleri ve beratları görebilir.
+Kullanıcılar taraf olarak imza attıkları sözleşme ve beratları görebilirler.
+
+Platformun bir admin yönetiçisine ait bir paneli olacak.
+Admin panelinden üretilen sözleşmelerin hepsi görülebilirek.
+Admin panelinden sözleşmelere onay verilir.
+Admin panelden tüm kullanıcıların yetkileri görülür istenilirse yetkiler askıya alınır yada kullanıcı tamamen silinir.
+
+Tasarım çok şık,eğlenceli ve güvenilir bir yapıda olmalı.
+Ziyaretci giriş sayfası platformu açıklayıcı ifadelerle anlatan bir yapıda olmalı. Kullanıcı kayıt ve kullanıcı giriş bölümleri olmalı. Global bir site olacağından kendinden emin bir duruşu olmalı.
+Esasen birazda güldürmeli ve huzur,umut vermeli.
+
+
+
+
+
+
+
+

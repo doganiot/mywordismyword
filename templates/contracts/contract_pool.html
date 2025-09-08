@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sözleşme Havuzu - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <!-- Başlık -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="fas fa-globe me-3"></i>
+                    Sözleşme Havuzu
+                </h1>
+                <p class="lead text-muted">
+                    Herkese açık sözleşmeleri inceleyin, ilham alın ve benzer sözleşmeler oluşturun
+                </p>
+            </div>
+
+            <!-- Arama Çubuğu -->
+            <div class="row justify-content-center mb-4">
+                <div class="col-md-8 col-lg-6">
+                    <form method="GET" class="d-flex">
+                        <div class="input-group">
+                            <input type="text" class="form-control form-control-lg"
+                                   placeholder="Sözleşme ara..."
+                                   name="q" value="{{ query }}"
+                                   id="searchInput">
+                            <button class="btn btn-primary btn-lg" type="submit">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Filtre Butonları -->
+            <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
+                <a href="{% url 'contracts:contract_pool' %}"
+                   class="btn {% if not query %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    <i class="fas fa-th-large me-1"></i>Tümü
+                </a>
+                <a href="{% url 'contracts:contract_pool' %}?q=dostluk"
+                   class="btn btn-outline-success">
+                    <i class="fas fa-heart me-1"></i>Dostluk
+                </a>
+                <a href="{% url 'contracts:contract_pool' %}?q=spor"
+                   class="btn btn-outline-info">
+                    <i class="fas fa-futbol me-1"></i>Spor
+                </a>
+                <a href="{% url 'contracts:contract_pool' %}?q=ilişki"
+                   class="btn btn-outline-danger">
+                    <i class="fas fa-heart me-1"></i>İlişki
+                </a>
+                <a href="{% url 'contracts:contract_pool' %}?q=buluşma"
+                   class="btn btn-outline-warning">
+                    <i class="fas fa-calendar me-1"></i>Buluşma
+                </a>
+            </div>
+
+            <!-- Sözleşmeler -->
+            {% if contracts %}
+                <div class="row g-4">
+                    {% for contract in contracts %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card h-100 border-0 shadow-sm hover-lift">
+                                <div class="card-body d-flex flex-column">
+                                    <!-- Sözleşme Başlığı -->
+                                    <h5 class="card-title fw-bold mb-3">
+                                        <a href="{% url 'contracts:contract_detail' pk=contract.pk %}"
+                                           class="text-decoration-none text-dark">
+                                            {{ contract.title }}
+                                        </a>
+                                    </h5>
+
+                                    <!-- Sözleşme İçeriği Özeti -->
+                                    <p class="card-text text-muted flex-grow-1">
+                                        {{ contract.content|truncatechars:150 }}
+                                    </p>
+
+                                    <!-- Sözleşme Bilgileri -->
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <small class="text-muted">
+                                                <i class="fas fa-user me-1"></i>
+                                                {{ contract.creator.get_full_name|default:contract.creator.username }}
+                                            </small>
+                                            <small class="text-muted">
+                                                <i class="fas fa-calendar me-1"></i>
+                                                {{ contract.created_at|date:"d.m.Y" }}
+                                            </small>
+                                        </div>
+
+                                        <!-- İstatistikler -->
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-users me-1"></i>
+                                                {{ contract.parties.count }} taraf
+                                            </small>
+                                            <small class="text-muted">
+                                                <i class="fas fa-signature me-1"></i>
+                                                {{ contract.signed_parties }} imza
+                                            </small>
+                                        </div>
+
+                                        <!-- Durum Badge'i -->
+                                        <div class="mt-2">
+                                            {% if contract.status == 'completed' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check-circle me-1"></i>Tamamlandı
+                                                </span>
+                                            {% elif contract.status == 'signed' %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-signature me-1"></i>İmzalandı
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-clock me-1"></i>Bekliyor
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Aksiyon Butonları -->
+                                    <div class="d-flex gap-2 mt-3">
+                                        <a href="{% url 'contracts:contract_detail' pk=contract.pk %}"
+                                           class="btn btn-outline-primary btn-sm flex-fill">
+                                            <i class="fas fa-eye me-1"></i>Görüntüle
+                                        </a>
+                                        <a href="{% url 'contracts:contract_pdf' pk=contract.pk %}"
+                                           class="btn btn-outline-success btn-sm">
+                                            <i class="fas fa-download me-1"></i>PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Sayfalama -->
+                {% if contracts.has_other_pages %}
+                    <nav class="mt-5">
+                        <ul class="pagination justify-content-center">
+                            {% if contracts.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ contracts.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">
+                                        <i class="fas fa-chevron-left"></i> Önceki
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in contracts.paginator.page_range %}
+                                {% if contracts.number == num %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ num }}</span>
+                                    </li>
+                                {% elif num > contracts.number|add:-3 and num < contracts.number|add:3 %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if contracts.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ contracts.next_page_number }}{% if query %}&q={{ query }}{% endif %}">
+                                        Sonraki <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+
+            {% else %}
+                <!-- Boş Durum -->
+                <div class="text-center py-5">
+                    <div class="empty-state">
+                        <i class="fas fa-search fa-4x text-muted mb-4"></i>
+                        <h3 class="text-muted">Sözleşme Bulunamadı</h3>
+                        {% if query %}
+                            <p class="text-muted mb-4">
+                                "{{ query }}" ile ilgili sözleşme bulunamadı.
+                            </p>
+                            <a href="{% url 'contracts:contract_pool' %}" class="btn btn-primary">
+                                <i class="fas fa-arrow-left me-1"></i>Tüm Sözleşmeleri Görüntüle
+                            </a>
+                        {% else %}
+                            <p class="text-muted mb-4">
+                                Henüz herkese açık sözleşme bulunmuyor.
+                            </p>
+                            <a href="{% url 'contracts:contract_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>İlk Sözleşmeyi Oluştur
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- İstatistikler Kartı -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card bg-gradient-primary text-white border-0">
+                <div class="card-body text-center py-4">
+                    <h4 class="card-title mb-3">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Platform İstatistikleri
+                    </h4>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h3 class="display-6 fw-bold">{{ contracts|length }}</h3>
+                                <small>Herkese Açık Sözleşme</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h3 class="display-6 fw-bold">
+                                    {% widthratio contracts|length 1 10 %}
+                                </h3>
+                                <small>Aktif Kullanıcı</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h3 class="display-6 fw-bold">0</h3>
+                                <small>Toplam İmza</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <h3 class="display-6 fw-bold">5</h3>
+                                <small>Sözleşme Şablonu</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Arama Script'i -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+
+    // Enter tuşu ile arama
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const form = this.closest('form');
+            form.submit();
+        }
+    });
+
+    // Gerçek zamanlı arama (opsiyonel)
+    let searchTimeout;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            // İleride AJAX arama eklenebilir
+        }, 300);
+    });
+});
+</script>
+
+<style>
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.empty-state {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.stat-item {
+    padding: 1rem 0;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.page-link {
+    color: #667eea;
+    border-color: #667eea;
+}
+
+.page-link:hover {
+    color: #764ba2;
+    background-color: #f8f9fa;
+    border-color: #764ba2;
+}
+
+.page-item.active .page-link {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+@media (max-width: 768px) {
+    .btn {
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-item h3 {
+        font-size: 1.5rem;
+    }
+}
+</style>
+{% endblock %}

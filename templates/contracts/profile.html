@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Profil - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Profil Başlığı -->
+            <div class="text-center mb-5">
+                <div class="profile-avatar mb-3">
+                    <i class="fas fa-user-circle fa-5x text-primary"></i>
+                </div>
+                <h1 class="display-5 fw-bold">
+                    {{ user.get_full_name|default:user.username }}
+                </h1>
+                <p class="text-muted">{{ user.email }}</p>
+                <small class="text-muted">
+                    Üye olma tarihi: {{ user.date_joined|date:"d F Y" }}
+                </small>
+            </div>
+
+            <!-- İstatistikler -->
+            <div class="row mb-5">
+                <div class="col-md-4">
+                    <div class="stat-card card text-center border-primary">
+                        <div class="card-body">
+                            <i class="fas fa-file-contract fa-3x text-primary mb-3"></i>
+                            <h3 class="card-title text-primary">{{ user_contracts_count }}</h3>
+                            <p class="card-text text-muted">Oluşturulan Sözleşme</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card card text-center border-success">
+                        <div class="card-body">
+                            <i class="fas fa-signature fa-3x text-success mb-3"></i>
+                            <h3 class="card-title text-success">{{ signed_contracts_count }}</h3>
+                            <p class="card-text text-muted">İmzalanan Sözleşme</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card card text-center border-info">
+                        <div class="card-body">
+                            <i class="fas fa-thumbs-up fa-3x text-info mb-3"></i>
+                            <h3 class="card-title text-info">{{ total_approvals }}</h3>
+                            <p class="card-text text-muted">Verilen Onay</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hızlı Aksiyonlar -->
+            <div class="card mb-5">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-rocket me-2"></i>
+                        Hızlı Aksiyonlar
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <a href="{% url 'contracts:contract_create' %}" class="btn btn-primary w-100 p-3">
+                                <i class="fas fa-plus fa-2x mb-2"></i>
+                                <br>
+                                <strong>Yeni Sözleşme</strong>
+                                <br>
+                                <small>Hazır şablonlarla hızlıca oluştur</small>
+                            </a>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'contracts:my_contracts' %}" class="btn btn-outline-primary w-100 p-3">
+                                <i class="fas fa-file-contract fa-2x mb-2"></i>
+                                <br>
+                                <strong>Sözleşmelerim</strong>
+                                <br>
+                                <small>Oluşturduklarınızı yönetin</small>
+                            </a>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'contracts:signed_contracts' %}" class="btn btn-outline-success w-100 p-3">
+                                <i class="fas fa-signature fa-2x mb-2"></i>
+                                <br>
+                                <strong>İmzalananlar</strong>
+                                <br>
+                                <small>İmzalanan sözleşmeleri görüntüleyin</small>
+                            </a>
+                        </div>
+                        <div class="col-md-6">
+                            <a href="{% url 'contracts:contract_pool' %}" class="btn btn-outline-info w-100 p-3">
+                                <i class="fas fa-globe fa-2x mb-2"></i>
+                                <br>
+                                <strong>Sözleşme Havuzu</strong>
+                                <br>
+                                <small>Herkese açık sözleşmeleri keşfedin</small>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hesap Bilgileri -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-cog me-2"></i>
+                        Hesap Bilgileri
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Kullanıcı Adı</label>
+                                <p class="form-control-plaintext">{{ user.username }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">E-posta</label>
+                                <p class="form-control-plaintext">{{ user.email }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Ad Soyad</label>
+                                <p class="form-control-plaintext">{{ user.get_full_name|default:"Belirtilmemiş" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Üyelik Tarihi</label>
+                                <p class="form-control-plaintext">{{ user.date_joined|date:"d F Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <a href="{% url 'account_change_password' %}" class="btn btn-outline-warning me-2">
+                            <i class="fas fa-key me-1"></i>
+                            Şifre Değiştir
+                        </a>
+                        <a href="{% url 'account_email' %}" class="btn btn-outline-info">
+                            <i class="fas fa-envelope me-1"></i>
+                            E-posta Ayarları
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.profile-avatar {
+    display: inline-block;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    margin-bottom: 1rem;
+}
+
+.stat-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    height: 100%;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+}
+
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.card-title {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .display-5 {
+        font-size: 2rem;
+    }
+
+    .stat-card .card-body {
+        padding: 1.5rem;
+    }
+
+    .card-title {
+        font-size: 2rem;
+    }
+
+    .row.g-3 .col-md-6 {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ contract.title }} Düzenle - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="fas fa-edit me-2"></i>
+                        Sözleşmeyi Düzenle
+                    </h4>
+                </div>
+
+                <div class="card-body p-4">
+                    {% if contract.is_editable %}
+                        <form method="post">
+                            {% csrf_token %}
+
+                            <!-- Sözleşme Başlığı -->
+                            <div class="mb-4">
+                                <label for="title" class="form-label fw-bold">
+                                    <i class="fas fa-heading me-1"></i>
+                                    Sözleşme Başlığı *
+                                </label>
+                                <input type="text" class="form-control form-control-lg" id="title" name="title"
+                                       value="{{ contract.title }}" required maxlength="200">
+                            </div>
+
+                            <!-- Sözleşme İçeriği -->
+                            <div class="mb-4">
+                                <label for="content" class="form-label fw-bold">
+                                    <i class="fas fa-file-alt me-1"></i>
+                                    Sözleşme İçeriği *
+                                </label>
+                                <textarea class="form-control" id="content" name="content" rows="20" required>{{ contract.content }}</textarea>
+                            </div>
+
+                            <!-- Görünürlük Ayarı -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="fas fa-eye me-1"></i>
+                                    Görünürlük Ayarı
+                                </label>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="visibility-option border rounded p-3 text-center">
+                                            <input type="radio" class="btn-check" name="visibility"
+                                                   id="private" value="private"
+                                                   {% if contract.visibility == 'private' %}checked{% endif %}>
+                                            <label class="btn btn-outline-primary w-100" for="private">
+                                                <i class="fas fa-lock fa-2x mb-2"></i>
+                                                <br>
+                                                <strong>Gizli</strong>
+                                                <br>
+                                                <small class="text-muted">Sadece taraflar görebilir</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="visibility-option border rounded p-3 text-center">
+                                            <input type="radio" class="btn-check" name="visibility"
+                                                   id="public" value="public"
+                                                   {% if contract.visibility == 'public' %}checked{% endif %}>
+                                            <label class="btn btn-outline-success w-100" for="public">
+                                                <i class="fas fa-globe fa-2x mb-2"></i>
+                                                <br>
+                                                <strong>Herkese Açık</strong>
+                                                <br>
+                                                <small class="text-muted">Herkes görebilir ve indirebilir</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Uyarı -->
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Uyarı:</strong> Sözleşmeyi düzenledikten sonra değişiklikleri geri alamazsınız.
+                                Tüm taraflara değişiklikler hakkında bilgi verin.
+                            </div>
+
+                            <!-- Butonlar -->
+                            <div class="d-flex gap-3 pt-3 border-top">
+                                <button type="submit" class="btn btn-warning btn-lg flex-fill">
+                                    <i class="fas fa-save me-2"></i>
+                                    Değişiklikleri Kaydet
+                                </button>
+                                <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="btn btn-outline-secondary btn-lg">
+                                    <i class="fas fa-arrow-left me-2"></i>
+                                    Geri Dön
+                                </a>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-lock fa-4x text-muted mb-4"></i>
+                            <h4 class="text-muted">Bu Sözleşme Düzenlenemez</h4>
+                            <p class="text-muted mb-4">
+                                Sözleşme tamamlandıktan sonra düzenleme yapılamaz.
+                            </p>
+                            <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="btn btn-primary">
+                                <i class="fas fa-eye me-2"></i>
+                                Sözleşmeyi Görüntüle
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.visibility-option {
+    transition: all 0.3s ease;
+}
+
+.visibility-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.btn-check:checked + .btn {
+    border-color: currentColor;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+@media (max-width: 768px) {
+    .d-flex.gap-3 {
+        flex-direction: column;
+    }
+
+    .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
