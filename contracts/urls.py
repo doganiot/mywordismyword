@@ -27,6 +27,7 @@ urlpatterns = [
     path('signed-contracts/', views.signed_contracts, name='signed_contracts'),
     path('invited-contracts/', views.invited_contracts, name='invited_contracts'),
     path('declined-contracts/', views.declined_contracts, name='declined_contracts'),
+    path('<uuid:pk>/recreate/', views.declined_contract_recreate, name='declined_contract_recreate'),
 
     # API endpoints
     path('api/contract/<uuid:pk>/verify-code/', views.verify_signature_code, name='verify_signature_code'),

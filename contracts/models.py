@@ -48,6 +48,7 @@ class Contract(models.Model):
         ('approved', 'Onaylandı'),
         ('completed', 'Tamamlandı'),
         ('cancelled', 'İptal Edildi'),
+        ('archived', 'Arşivlendi'),
     ]
 
     VISIBILITY_CHOICES = [

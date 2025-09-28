@@ -405,6 +405,122 @@ def contract_edit(request, pk):
 
 
 @login_required
+def declined_contract_recreate(request, pk):
+    """Red edilen sözleşmeyi yeni sözleşme olarak yeniden oluştur"""
+    original_contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    
+    # Sadece red edilmiş sözleşmeler için
+    if not original_contract.has_declined_parties():
+        messages.error(request, 'Bu sözleşme red edilmemiş.')
+        return redirect('contracts:declined_contracts')
+    
+    if request.method == 'POST':
+        # Yeni sözleşme oluştur
+        title = request.POST.get('title', original_contract.title)
+        content = request.POST.get('content', original_contract.content)
+        visibility = request.POST.get('visibility', original_contract.visibility)
+        is_self_contract = request.POST.get('is_self_contract') == 'on'
+        
+        # Tarih bilgileri
+        start_date_str = request.POST.get('start_date')
+        duration_months = int(request.POST.get('duration_months', 12))
+        is_indefinite = request.POST.get('is_indefinite') == 'on'
+        
+        if start_date_str:
+            start_date_obj = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        else:
+            start_date_obj = timezone.now().date()
+        
+        # Sözleşme içeriğini dinamikleştir
+        enhanced_content = generate_contract_content(content, request.user, None)
+        
+        # Yeni sözleşme oluştur
+        new_contract = Contract.objects.create(
+            title=title,
+            content=enhanced_content,
+            creator=request.user,
+            visibility=visibility,
+            is_self_contract=is_self_contract,
+            start_date=start_date_obj,
+            duration_months=duration_months,
+            is_indefinite=is_indefinite
+        )
+        
+        new_contract.is_editable = True
+        new_contract.save()
+        
+        # Creator'ı otomatik olarak taraf olarak ekle
+        creator_party = ContractParty.objects.create(
+            contract=new_contract,
+            user=request.user,
+            role='party'
+        )
+        
+        # Creator için imza kaydı oluştur
+        creator_signature_code = generate_signature_code()
+        ContractSignature.objects.create(
+            contract=new_contract,
+            party=creator_party,
+            user=request.user,
+            signature_code=creator_signature_code
+        )
+        
+        # İkinci tarafı ekle (sadece normal sözleşmeler için)
+        if not is_self_contract:
+            second_party_id = request.POST.get('second_party_id')
+            if second_party_id:
+                try:
+                    second_party = User.objects.get(id=second_party_id)
+                    party = ContractParty.objects.create(
+                        contract=new_contract,
+                        user=second_party,
+                        role='party'
+                    )
+                    # İkinci taraf için imza kaydı oluştur
+                    signature_code = generate_signature_code()
+                    ContractSignature.objects.create(
+                        contract=new_contract,
+                        party=party,
+                        user=second_party,
+                        signature_code=signature_code
+                    )
+                    # Sözleşme daveti ve imza e-postası gönder
+                    send_contract_invitation_email(second_party.email, new_contract, request.user)
+                    send_signature_email(second_party.email, new_contract, signature_code)
+                except User.DoesNotExist:
+                    pass
+        
+        # Eski sözleşmeyi arşivle (status'u archived yap)
+        original_contract.status = 'archived'
+        original_contract.save()
+        
+        messages.success(request, f'Red edilen sözleşme "{original_contract.title}" yeni sözleşme olarak oluşturuldu!')
+        return redirect('contracts:contract_detail', pk=new_contract.pk)
+    
+    # Red edilen tarafları al
+    declined_parties = original_contract.parties.filter(invitation_status='declined')
+    
+    # Kullanıcıları al (yeni taraf seçimi için)
+    users = User.objects.exclude(id=request.user.id).order_by('first_name', 'last_name', 'username')
+    
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+    
+    return render(request, 'contracts/declined_contract_recreate.html', {
+        'original_contract': original_contract,
+        'declined_parties': declined_parties,
+        'users': users,
+        'invited_contracts_count': invited_contracts_count
+    })
+
+
+@login_required
 def contract_delete(request, pk):
     """Sözleşme silme"""
     contract = get_object_or_404(Contract, pk=pk, creator=request.user)
