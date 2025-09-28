@@ -13,6 +13,7 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3 class="mb-0">
                         <i class="fas fa-file-contract me-2"></i>
+                        <span class="badge bg-primary me-2">#{{ contract.contract_number }}</span>
                         {{ contract.title }}
                     </h3>
                     <div>
@@ -30,11 +31,15 @@
                 <div class="card-body">
                     <!-- Sözleşme Bilgileri -->
                     <div class="row mb-4">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <small class="text-muted">Sözleşme No</small>
+                            <div class="fw-bold text-primary">#{{ contract.contract_number }}</div>
+                        </div>
+                        <div class="col-md-4">
                             <small class="text-muted">Oluşturan</small>
                             <div class="fw-bold">{{ contract.creator.get_full_name|default:contract.creator.username }}</div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <small class="text-muted">Oluşturulma Tarihi</small>
                             <div>{{ contract.created_at|date:"d F Y, H:i" }}</div>
                         </div>
@@ -59,6 +64,11 @@
                     <h5 class="mb-0">
                         <i class="fas fa-users me-2"></i>
                         Sözleşme Tarafları ({{ parties|length }})
+                        {% if contract.is_self_contract %}
+                            <span class="badge bg-danger ms-2">
+                                <i class="fas fa-heart"></i> Kişisel Sözleşme
+                            </span>
+                        {% endif %}
                     </h5>
                 </div>
                 <div class="card-body">
@@ -73,7 +83,7 @@
                                                 <small class="text-muted">{{ party.display_email }}</small>
                                                 <br>
                                                 <span class="badge bg-light text-dark mt-1">
-                                                    {{ party.get_role_display }}
+                                                    {{ party.display_role }}
                                                 </span>
                                             </div>
                                             <div class="text-end">
@@ -117,9 +127,9 @@
                 </div>
             </div>
 
-            <!-- İmzalar ve Onaylar -->
+            <!-- İmzalar -->
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-12">
                     <div class="card mb-4">
                         <div class="card-header">
                             <h6 class="mb-0">
@@ -151,6 +161,14 @@
                                                         <span class="badge bg-danger">
                                                             <i class="fas fa-times"></i> Reddedildi
                                                         </span>
+                                                        {% if party.decline_reason %}
+                                                            <div class="mt-2 p-2 bg-danger bg-opacity-10 rounded">
+                                                                <small class="text-dark">
+                                                                    <strong><i class="fas fa-comment me-1"></i>Red Nedeni:</strong><br>
+                                                                    <span class="text-break">{{ party.decline_reason }}</span>
+                                                                </small>
+                                                            </div>
+                                                        {% endif %}
                                                     {% endif %}
                                                 </div>
                                             </div>
@@ -172,7 +190,7 @@
                                         {% with signature=party.signatures.first %}
                                             {% if signature and signature.is_signed %}
                                                 <div class="text-center">
-                                                    <img src="{% static 'images/sozomsozonay.png' %}" alt="Onaylandı" class="mb-2" style="width: 100px; height: 50px;">
+                                                    <img src="{% static 'images/sozomsozonay.png' %}" alt="İmzalandı" class="mb-2" style="width: 150px; height: 75px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                                                     <div class="badge bg-success">
                                                         <i class="fas fa-check"></i>
                                                         {{ signature.signed_at|date:"d.m.Y H:i" }}
@@ -193,38 +211,6 @@
                             {% empty %}
                                 <p class="text-muted mb-0">Henüz taraf yok.</p>
                             {% endfor %}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="fas fa-thumbs-up me-2"></i>
-                                Onaylar ({{ approvals|length }})
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            {% if approvals %}
-                                {% for approval in approvals %}
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span>{{ approval.user.get_full_name|default:approval.user.username }}</span>
-                                        {% if approval.is_approved %}
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-check"></i>
-                                                {{ approval.approved_at|date:"d.m.Y" }}
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">
-                                                <i class="fas fa-clock"></i> Bekliyor
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <p class="text-muted mb-0">Henüz onay yok.</p>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -290,12 +276,12 @@
                     {% elif contract.status == 'draft' and contract.can_be_deleted %}
                         <div class="alert alert-warning">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Taslak Sözleşme:</strong> Bu sözleşme henüz taslak aşamasında. İmzalandıktan veya onaylandıktan sonra asla değiştirilemez.
+                            <strong>Taslak Sözleşme:</strong> Bu sözleşme henüz taslak aşamasında. İmzalandıktan sonra asla değiştirilemez ve silinemez.
                         </div>
                     {% endif %}
 
                     <!-- Düzenleme Butonu -->
-                    {% if user.is_authenticated and contract.creator == user and contract.is_editable %}
+                    {% if user.is_authenticated and contract.creator == user and contract.is_editable_check %}
                         <a href="{% url 'contracts:contract_edit' pk=contract.pk %}" class="btn btn-outline-primary">
                             <i class="fas fa-edit me-1"></i> Düzenle
                         </a>
@@ -321,11 +307,6 @@
                         </a>
                     {% endif %}
 
-                    {% if user.is_authenticated and not user_has_approved %}
-                        <button class="btn btn-outline-info" onclick="approveContract()">
-                            <i class="fas fa-thumbs-up me-1"></i> Onayla
-                        </button>
-                    {% endif %}
 
                     {% if user.is_authenticated and contract.creator == user %}
                         <button class="btn btn-outline-secondary" onclick="showAddPartyModal()">
@@ -348,12 +329,55 @@
                         </div>
                         <div class="col-6">
                             <div class="stat-number">{{ contract.signed_parties }}</div>
-                            <small class="text-muted">İmza</small>
+                            <small class="text-muted">
+                                {% if contract.is_self_contract %}
+                                    İmza
+                                    <span class="badge bg-danger ms-1">
+                                        <i class="fas fa-heart"></i> Kişisel Sözleşme
+                                    </span>
+                                {% else %}
+                                    İmza
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    <!-- Sözleşme Zamanlaması Bilgileri -->
+                    <div class="row text-center mt-3">
+                        <div class="col-6">
+                            <div class="stat-number">{{ contract.start_date|date:"d.m.Y" }}</div>
+                            <small class="text-muted">Başlangıç Tarihi</small>
                         </div>
                         <div class="col-6">
-                            <div class="stat-number">{{ contract.approved_parties }}</div>
-                            <small class="text-muted">Onay</small>
+                            <div class="stat-number">
+                                {% if contract.is_indefinite %}
+                                    <i class="fas fa-infinity"></i>
+                                {% else %}
+                                    {{ contract.end_date|date:"d.m.Y" }}
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">
+                                {% if contract.is_indefinite %}
+                                    Süresiz
+                                {% else %}
+                                    Bitiş Tarihi
+                                {% endif %}
+                            </small>
                         </div>
+                        <div class="col-12 mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Süre: {{ contract.duration_display }}
+                            </small>
+                        </div>
+                    </div>
+
+                    {% if contract.is_self_contract %}
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Kişisel Sözleşme:</strong> Bu sözleşme sadece kendinizi bağlayan kişisel bir sözleşmedir.
+                            Tek imza ile tamamlanır ve sadece sizin sayfanızda görünür.
+                        </div>
+                    {% endif %}
                         <div class="col-6">
                             <div class="stat-number">{{ comments|length }}</div>
                             <small class="text-muted">Yorum</small>
@@ -532,26 +556,6 @@ function showAddPartyModal() {
     new bootstrap.Modal(document.getElementById('addPartyModal')).show();
 }
 
-function approveContract() {
-    if (confirm('Bu sözleşmeyi onaylamak istediğinizden emin misiniz?')) {
-        fetch('{% url "contracts:contract_approve" pk=contract.pk %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: ''
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Hata: ' + data.message);
-            }
-        });
-    }
-}
 
 function shareOnFacebook() {
     const url = encodeURIComponent(window.location.href);

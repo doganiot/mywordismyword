@@ -70,6 +70,7 @@
                                     <h5 class="card-title fw-bold mb-3">
                                         <a href="{% url 'contracts:contract_detail' pk=contract.pk %}"
                                            class="text-decoration-none text-dark">
+                                            <span class="badge bg-primary me-2">#{{ contract.contract_number }}</span>
                                             {{ contract.title }}
                                         </a>
                                     </h5>
@@ -128,10 +129,17 @@
                                            class="btn btn-outline-primary btn-sm flex-fill">
                                             <i class="fas fa-eye me-1"></i>Görüntüle
                                         </a>
-                                        <a href="{% url 'contracts:contract_pdf' pk=contract.pk %}"
-                                           class="btn btn-outline-success btn-sm">
-                                            <i class="fas fa-download me-1"></i>PDF
-                                        </a>
+                                        <div class="dropdown">
+                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                                    type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1050;">
+                                                <li><a class="dropdown-item" href="{% url 'contracts:contract_pdf' pk=contract.pk %}">
+                                                    <i class="fas fa-download me-2"></i>PDF İndir
+                                                </a></li>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -305,6 +313,23 @@ document.addEventListener('DOMContentLoaded', function() {
 .page-item.active .page-link {
     background-color: #667eea;
     border-color: #667eea;
+}
+
+/* Dropdown z-index düzeltmesi */
+.dropdown-menu {
+    z-index: 1050 !important;
+    position: absolute !important;
+}
+
+/* Kartların z-index'ini düşür */
+.card {
+    position: relative;
+    z-index: 1;
+}
+
+/* Dropdown açıldığında kartın z-index'ini artır */
+.dropdown.show .card {
+    z-index: 2;
 }
 
 @media (max-width: 768px) {

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
 import uuid
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 class ContractTemplate(models.Model):
@@ -56,6 +56,7 @@ class Contract(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    contract_number = models.PositiveIntegerField(unique=True, verbose_name="Sözleşme No", help_text="Otomatik oluşturulan sıralı numara")
     title = models.CharField(max_length=200, verbose_name="Sözleşme Başlığı")
     content = models.TextField(verbose_name="Sözleşme İçeriği")
     template = models.ForeignKey(ContractTemplate, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Şablon")
@@ -65,7 +66,13 @@ class Contract(models.Model):
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default='private', verbose_name="Görünürlük")
 
     is_editable = models.BooleanField(default=True, verbose_name="Düzenlenebilir")
+    is_self_contract = models.BooleanField(default=False, verbose_name="Kişisel Sözleşme", help_text="Sadece kendinizi bağlayan sözleşme (Vicdan sözleşmesi)")
     system_approved = models.BooleanField(default=False, verbose_name="Sistem Onayı")
+
+    # Sözleşme zamanlaması
+    start_date = models.DateField(default=timezone.now, verbose_name="Sözleşme Başlangıç Tarihi", help_text="Sözleşmenin yürürlüğe gireceği tarih")
+    duration_months = models.PositiveIntegerField(null=True, blank=True, verbose_name="Sözleşme Süresi (Ay)", help_text="Sözleşme süresi ay cinsinden")
+    is_indefinite = models.BooleanField(default=False, verbose_name="Süresiz Sözleşme", help_text="Bu sözleşme süresiz mi?")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -77,10 +84,10 @@ class Contract(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return self.title
+        return f"#{self.contract_number} - {self.title}"
 
     def get_absolute_url(self):
-        return reverse('contract_detail', kwargs={'pk': self.pk})
+        return reverse('contracts:contract_detail', kwargs={'pk': self.pk})
 
     @property
     def total_parties(self):
@@ -96,8 +103,13 @@ class Contract(models.Model):
 
     @property
     def can_be_completed(self):
-        """Sözleşme tamamlanabilir mi kontrolü (en az 3 onay gerekli)"""
-        return self.signed_parties >= 2 and self.system_approved and self.approved_parties >= 3
+        """Sözleşme tamamlanabilir mi kontrolü"""
+        if self.is_self_contract:
+            # Vicdan sözleşmeleri için 1 imza yeterli
+            return self.signed_parties >= 1
+        else:
+            # Normal sözleşmeler için 2 imza gerekli
+            return self.signed_parties >= 2
 
     def user_has_approved(self, user):
         """Kullanıcının bu sözleşmeyi onaylayıp onaylamadığını kontrol eder"""
@@ -121,13 +133,51 @@ class Contract(models.Model):
         return self.status in ['completed', 'signed', 'approved']
 
     @property
+    def end_date(self):
+        """Sözleşmenin bitiş tarihini hesaplar"""
+        if self.is_indefinite:
+            return None
+        elif self.duration_months and self.start_date:
+            from dateutil.relativedelta import relativedelta
+            return self.start_date + relativedelta(months=self.duration_months)
+        return None
+
+    @property
+    def duration_display(self):
+        """Sözleşme süresini kullanıcı dostu şekilde gösterir"""
+        if self.is_indefinite:
+            return "Süresiz"
+        elif self.duration_months:
+            if self.duration_months == 1:
+                return "1 Ay"
+            elif self.duration_months < 12:
+                return f"{self.duration_months} Ay"
+            elif self.duration_months == 12:
+                return "1 Yıl"
+            elif self.duration_months % 12 == 0:
+                return f"{self.duration_months // 12} Yıl"
+            else:
+                years = self.duration_months // 12
+                months = self.duration_months % 12
+                return f"{years} Yıl {months} Ay"
+        return "Belirtilmemiş"
+
+    def is_editable_check(self):
+        """Sözleşme düzenlenebilir mi kontrolü (imzalanan sözleşmeler düzenlenemez)"""
+        # Sözleşme tamamlandıysa veya herhangi bir imza varsa düzenlenemez
+        # Ancak red edilmiş sözleşmeler düzenlenebilir
+        return not (self.status == 'completed' or self.signatures.filter(is_signed=True).exists()) or self.has_declined_parties()
+
+    @property
     def can_be_deleted(self):
-        """Sözleşme silinebilir mi kontrolü"""
-        # Sadece taslak durumunda ve hiç imza/onay yoksa silinebilir
-        return (self.status == 'draft' and
-                self.signed_parties == 0 and
-                self.approved_parties == 0 and
-                not self.system_approved)
+        """Sözleşme silinebilir mi kontrolü - İmzalanan sözleşmeler asla silinemez"""
+        # Sadece taslak durumunda ve hiç imza yoksa silinebilir
+        # Veya red edilmiş sözleşmeler silinebilir
+        return (self.status == 'draft' and self.signed_parties == 0) or self.has_declined_parties()
+    
+    def has_declined_parties(self):
+        """Sözleşmede red eden taraflar var mı kontrolü"""
+        return self.parties.filter(invitation_status='declined').exists()
 
     def check_integrity(self):
         """Sözleşme bütünlüğünü kontrol et"""
@@ -160,9 +210,11 @@ class ContractParty(models.Model):
     ]
 
     invitation_status = models.CharField(max_length=20, choices=INVITATION_STATUS_CHOICES, default='pending', verbose_name="Davet Durumu")
+    decline_reason = models.TextField(blank=True, null=True, verbose_name="Red Nedeni", help_text="Sözleşme reddedilirken belirtilen neden")
 
     invited_at = models.DateTimeField(auto_now_add=True)
     joined_at = models.DateTimeField(null=True, blank=True, verbose_name="Katılma Tarihi")
+    declined_at = models.DateTimeField(null=True, blank=True, verbose_name="Red Tarihi")
 
     class Meta:
         verbose_name = "Sözleşme Tarafı"
@@ -186,6 +238,11 @@ class ContractParty(models.Model):
         if self.user:
             return self.user.email
         return self.email or ""
+
+    @property
+    def display_role(self):
+        """Görüntülenecek rolü döndürür"""
+        return self.get_role_display()
 
     @property
     def can_be_removed(self):
@@ -308,3 +365,15 @@ def save_user_profile(sender, instance, **kwargs):
             instance.profile.save()
     except:
         pass
+
+
+@receiver(pre_save, sender=Contract)
+def set_contract_number(sender, instance, **kwargs):
+    """Sözleşme kaydedilmeden önce sıralı numara ata"""
+    if not instance.contract_number:
+        # En yüksek contract_number'ı bul ve 1 ekle
+        last_contract = Contract.objects.order_by('-contract_number').first()
+        if last_contract and last_contract.contract_number:
+            instance.contract_number = last_contract.contract_number + 1
+        else:
+            instance.contract_number = 1000  # İlk sözleşme 1000'den başlasın

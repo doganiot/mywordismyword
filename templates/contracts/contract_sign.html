@@ -20,6 +20,12 @@
                     <div class="text-center mb-4">
                         <h5 class="fw-bold">{{ contract.title }}</h5>
                         <p class="text-muted">{{ contract.creator.get_full_name|default:contract.creator.username }} tarafından oluşturuldu</p>
+                        {% if user_party.user %}
+                            <p class="text-primary fw-bold">
+                                <i class="fas fa-user me-1"></i>
+                                {{ user_party.user.get_full_name|default:user_party.user.username }} olarak imzalayacaksınız
+                            </p>
+                        {% endif %}
                     </div>
 
                     {% if user_party.signatures.exists and user_party.signatures.first.is_signed %}

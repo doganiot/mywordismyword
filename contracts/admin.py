@@ -13,10 +13,10 @@ class ContractTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    list_display = ['title', 'creator', 'status', 'visibility', 'created_at', 'total_parties', 'signed_parties']
-    list_filter = ['status', 'visibility', 'is_editable', 'system_approved', 'created_at']
-    search_fields = ['title', 'content', 'creator__username', 'creator__email']
-    readonly_fields = ['id', 'created_at', 'updated_at', 'completed_at']
+    list_display = ['contract_number', 'title', 'creator', 'status', 'visibility', 'is_self_contract', 'start_date', 'duration_display', 'created_at', 'total_parties', 'signed_parties']
+    list_filter = ['status', 'visibility', 'is_self_contract', 'is_indefinite', 'system_approved', 'created_at', 'start_date']
+    search_fields = ['contract_number', 'title', 'content', 'creator__username', 'creator__email']
+    readonly_fields = ['id', 'contract_number', 'created_at', 'updated_at', 'completed_at']
     ordering = ['-created_at']
 
     def get_queryset(self, request):

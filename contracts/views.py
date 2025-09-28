@@ -21,7 +21,7 @@ from .models import (
 )
 
 
-def generate_contract_content(base_content, creator):
+def generate_contract_content(base_content, creator, second_party_id=None):
     """Sözleşme içeriğini dinamikleştir"""
     from datetime import datetime
 
@@ -48,6 +48,20 @@ TARAFLAR:
 
 """
 
+    # İkinci taraf varsa ekle
+    if second_party_id:
+        try:
+            second_user = User.objects.get(id=second_party_id)
+            parties_section += f"""
+2. Taraf:
+   Ad Soyad: {second_user.get_full_name() or second_user.username}
+   E-posta: {second_user.email}
+   Rol: Sözleşmenin Diğer Tarafı
+
+"""
+        except User.DoesNotExist:
+            pass
+
     # Ana sözleşme içeriği
     main_content = f"""
 SÖZLEŞME İÇERİĞİ:
@@ -57,8 +71,20 @@ SÖZLEŞME İÇERİĞİ:
 
 """
 
-    # İmza bölümü
-    signature_section = """
+    # İmza bölümü - tarafların ad ve soyadları ile
+    signature_parties = f"""
+1. Taraf: {creator.get_full_name() or creator.username}
+"""
+    if second_party_id:
+        try:
+            second_user = User.objects.get(id=second_party_id)
+            signature_parties += f"""
+2. Taraf: {second_user.get_full_name() or second_user.username}
+"""
+        except User.DoesNotExist:
+            pass
+
+    signature_section = f"""
 
 İMZA BÖLÜMÜ:
 ============
@@ -66,8 +92,10 @@ SÖZLEŞME İÇERİĞİ:
 Bu sözleşme SözümSöz platformu üzerinden elektronik olarak imzalanacaktır.
 Tüm taraflar sözleşmeyi inceleyip onayladıktan sonra sözleşme geçerli olacaktır.
 
+{signature_parties}
+
 Platform: SözümSöz
-Tarih: """ + datetime.now().strftime('%d/%m/%Y %H:%M') + """
+Tarih: {datetime.now().strftime('%d/%m/%Y %H:%M')}
 
 """
 
@@ -89,6 +117,16 @@ def home(request):
             status='completed'
         ).order_by('-created_at')[:10]
 
+        # Davet edilen sözleşmeleri hesapla
+        invited_contracts_count = Contract.objects.filter(
+            parties__user=request.user,
+            parties__user__isnull=False,
+            parties__invitation_status__in=['pending', 'accepted']
+        ).exclude(
+            signatures__user=request.user,
+            signatures__is_signed=True
+        ).distinct().count()
+
         context = {
             'recent_contracts': recent_contracts,
             'public_contracts': public_contracts,
@@ -97,6 +135,7 @@ def home(request):
                 user=request.user,
                 is_signed=True
             ).count(),
+            'invited_contracts_count': invited_contracts_count,
         }
     else:
         public_contracts = Contract.objects.filter(
@@ -120,36 +159,61 @@ def contract_create(request):
         template_id = request.POST.get('template')
         visibility = request.POST.get('visibility', 'private')
         second_party_id = request.POST.get('second_party')
+        contract_type = request.POST.get('contract_type', 'other')
 
-        # Sözleşme içeriğini dinamikleştir
-        enhanced_content = generate_contract_content(content, request.user)
+        # Sözleşme zamanlaması
+        start_date = request.POST.get('start_date')
+        duration_months = request.POST.get('duration_months')
+        is_indefinite = request.POST.get('is_indefinite') == 'on'
 
-        # İkinci taraf varsa içeriğe ekle
-        if second_party_id:
+        # Validasyon
+        from datetime import datetime
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            if start_date_obj < datetime.now().date():
+                messages.error(request, 'Sözleşme başlangıç tarihi geçmiş bir tarih olamaz.')
+                return redirect('contracts:contract_create')
+        except ValueError:
+            messages.error(request, 'Geçersiz tarih formatı.')
+            return redirect('contracts:contract_create')
+
+        if not is_indefinite and not duration_months:
+            messages.error(request, 'Süresiz sözleşme değilse süre belirtmelisiniz.')
+            return redirect('contracts:contract_create')
+
+        if is_indefinite:
+            duration_months = None
+        else:
             try:
-                second_user = User.objects.get(id=second_party_id)
-                parties_section = f"""
+                duration_months = int(duration_months)
+                if duration_months <= 0 or duration_months > 1200:  # Max 100 yıl
+                    raise ValueError
+            except (ValueError, TypeError):
+                messages.error(request, 'Geçersiz sözleşme süresi (1-1200 ay arası olmalı).')
+                return redirect('contracts:contract_create')
 
-2. Taraf:
-   Ad Soyad: {second_user.get_full_name() or second_user.username}
-   E-posta: {second_user.email}
-   Rol: Sözleşmenin Diğer Tarafı
+        # Vicdan sözleşmesi ise görünürlüğü private yap
+        is_self_contract = contract_type == 'self'
+        if is_self_contract:
+            visibility = 'private'
 
-"""
-                # Taraflar bölümünü güncelle
-                enhanced_content = enhanced_content.replace(
-                    "Rol: Sözleşmeyi Oluşturan Taraf",
-                    f"Rol: Sözleşmeyi Oluşturan Taraf{parties_section}"
-                )
-            except User.DoesNotExist:
-                pass
+        # Sözleşme içeriğini dinamikleştir (şimdilik basic)
+        enhanced_content = generate_contract_content(content, request.user, None)
 
         contract = Contract.objects.create(
             title=title,
             content=enhanced_content,
             creator=request.user,
-            visibility=visibility
+            visibility=visibility,
+            is_self_contract=is_self_contract,
+            start_date=start_date_obj,
+            duration_months=duration_months,
+            is_indefinite=is_indefinite
         )
+
+        # is_editable field'ını True olarak set et
+        contract.is_editable = True
+        contract.save()
 
         if template_id:
             try:
@@ -160,23 +224,50 @@ def contract_create(request):
                 pass
 
         # Creator'ı otomatik olarak taraf olarak ekle
-        ContractParty.objects.create(
+        creator_party = ContractParty.objects.create(
             contract=contract,
             user=request.user,
             role='party'
         )
 
-        # İkinci tarafı ekle (varsa)
-        if second_party_id:
+        # Creator için imza kaydı oluştur
+        creator_signature_code = generate_signature_code()
+        ContractSignature.objects.create(
+            contract=contract,
+            party=creator_party,
+            user=request.user,
+            signature_code=creator_signature_code
+        )
+
+        # İkinci tarafı ekle (sadece normal sözleşmeler için)
+        if not is_self_contract and second_party_id:
             try:
                 second_party = User.objects.get(id=second_party_id)
-                ContractParty.objects.create(
+                party = ContractParty.objects.create(
                     contract=contract,
                     user=second_party,
                     role='party'
                 )
+
+                # İkinci taraf için imza kaydı oluştur
+                signature_code = generate_signature_code()
+                ContractSignature.objects.create(
+                    contract=contract,
+                    party=party,
+                    user=second_party,
+                    signature_code=signature_code
+                )
+
+                # Sözleşme daveti ve imza e-postası gönder
+                send_contract_invitation_email(second_party.email, contract, request.user)
+                send_signature_email(second_party.email, contract, signature_code)
             except User.DoesNotExist:
                 pass
+
+        # Sözleşme içeriğini taraflarla güncelle
+        updated_content = generate_contract_content(content, request.user, second_party_id if not is_self_contract else None)
+        contract.content = updated_content
+        contract.save()
 
         messages.success(request, 'Sözleşme başarıyla oluşturuldu!')
         return redirect('contracts:contract_detail', pk=contract.pk)
@@ -184,17 +275,42 @@ def contract_create(request):
     templates = ContractTemplate.objects.filter(is_active=True)
     # Sistemdeki diğer kullanıcıları al (creator hariç)
     other_users = User.objects.exclude(id=request.user.id)[:50]  # İlk 50 kullanıcı
+
+    # Davet edilen sözleşme sayısı
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     return render(request, 'contracts/contract_create.html', {
         'templates': templates,
-        'other_users': other_users
+        'other_users': other_users,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
 def contract_templates(request):
     """Sözleşme şablonları"""
     templates = ContractTemplate.objects.filter(is_active=True)
+
+    invited_contracts_count = 0
+    if request.user.is_authenticated:
+        invited_contracts_count = Contract.objects.filter(
+            parties__user=request.user,
+            parties__user__isnull=False,
+            parties__invitation_status__in=['pending', 'accepted']
+        ).exclude(
+            signatures__user=request.user,
+            signatures__is_signed=True
+        ).distinct().count()
+
     return render(request, 'contracts/contract_templates.html', {
-        'templates': templates
+        'templates': templates,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
@@ -224,14 +340,25 @@ def contract_detail(request, pk):
         except ContractParty.DoesNotExist:
             pass
 
+    # Davet edilen sözleşme sayısı
+    invited_contracts_count = 0
+    if request.user.is_authenticated:
+        invited_contracts_count = Contract.objects.filter(
+            parties__user=request.user,
+            parties__user__isnull=False,
+            parties__invitation_status__in=['pending', 'accepted']
+        ).exclude(
+            signatures__user=request.user,
+            signatures__is_signed=True
+        ).distinct().count()
+
     context = {
         'contract': contract,
         'user_party': user_party,
         'parties': contract.parties.all(),
         'signatures': contract.signatures.all(),
-        'approvals': contract.approvals.all(),
         'comments': contract.comments.all(),
-        'user_has_approved': contract.user_has_approved(request.user) if request.user.is_authenticated else False,
+        'invited_contracts_count': invited_contracts_count,
     }
 
     return render(request, 'contracts/contract_detail.html', context)
@@ -249,7 +376,7 @@ def contract_edit(request, pk):
         messages.error(request, str(e))
         return redirect('contracts:contract_detail', pk=pk)
 
-    if not contract.is_editable:
+    if not contract.is_editable_check():
         messages.error(request, 'Bu sözleşme artık düzenlenemez.')
         return redirect('contracts:contract_detail', pk=pk)
 
@@ -262,8 +389,18 @@ def contract_edit(request, pk):
         messages.success(request, 'Sözleşme başarıyla güncellendi!')
         return redirect('contracts:contract_detail', pk=pk)
 
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     return render(request, 'contracts/contract_edit.html', {
-        'contract': contract
+        'contract': contract,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
@@ -274,7 +411,7 @@ def contract_delete(request, pk):
 
     # Sözleşme silinebilir mi kontrolü
     if not contract.can_be_deleted:
-        messages.error(request, 'Bu sözleşme silinemez. Sözleşme tamamlandıktan veya imzalandıktan sonra asla silinemez.')
+        messages.error(request, 'Bu sözleşme silinemez. İmzalanan sözleşmeler asla silinemez.')
         return redirect('contracts:contract_detail', pk=pk)
 
     if request.method == 'POST':
@@ -287,8 +424,18 @@ def contract_delete(request, pk):
             messages.error(request, f'Sözleşme silinirken bir hata oluştu: {str(e)}')
             return redirect('contracts:contract_detail', pk=pk)
 
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     return render(request, 'contracts/contract_confirm_delete.html', {
-        'contract': contract
+        'contract': contract,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
@@ -314,6 +461,47 @@ def remove_contract_party(request, pk, party_id):
             messages.error(request, f'Taraf çıkarılırken bir hata oluştu: {str(e)}')
 
     return redirect('contracts:contract_detail', pk=pk)
+
+
+@login_required
+def contract_decline(request, pk):
+    """Sözleşmeyi reddetme"""
+    contract = get_object_or_404(Contract, pk=pk)
+    user_party = get_object_or_404(ContractParty, contract=contract, user=request.user)
+
+    if request.method == 'POST':
+        # Red nedeni al
+        decline_reason = request.POST.get('decline_reason', '').strip()
+        
+        # Sözleşme reddetme işlemi
+        user_party.invitation_status = 'declined'
+        user_party.decline_reason = decline_reason
+        user_party.declined_at = timezone.now()
+        user_party.save()
+
+        # Sözleşme oluşturucusuna e-posta gönder
+        send_contract_declined_email(contract.creator.email, contract, request.user, decline_reason)
+
+        if decline_reason:
+            messages.success(request, f'Sözleşme daveti reddedildi. Red nedeni kaydedildi.')
+        else:
+            messages.success(request, 'Sözleşme daveti reddedildi.')
+        return redirect('contracts:invited_contracts')
+
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
+    return render(request, 'contracts/contract_decline.html', {
+        'contract': contract,
+        'user_party': user_party,
+        'invited_contracts_count': invited_contracts_count,
+    })
 
 
 @login_required
@@ -345,10 +533,10 @@ def contract_sign(request, pk):
 
             messages.success(request, 'Sözleşme başarıyla imzalandı!')
 
-            # Sistem onayını kontrol et
-            if contract.signed_parties >= 2 and not contract.system_approved:
-                contract.system_approved = True
-                contract.save()
+            # Sözleşmeyi tamamlama kontrolü
+            if contract.can_be_completed:
+                contract.mark_as_completed()
+                messages.success(request, 'Sözleşme tamamlandı ve artık değiştirilemez!')
 
             return redirect('contracts:contract_detail', pk=pk)
         else:
@@ -369,9 +557,19 @@ def contract_sign(request, pk):
         # E-posta gönder
         send_signature_email(request.user.email, contract, signature_code)
 
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     return render(request, 'contracts/contract_sign.html', {
         'contract': contract,
-        'user_party': user_party
+        'user_party': user_party,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
@@ -379,6 +577,11 @@ def contract_sign(request, pk):
 def contract_approve(request, pk):
     """Sözleşmeyi onaylama"""
     contract = get_object_or_404(Contract, pk=pk)
+
+    # Sözleşme tamamlandıysa onaylamaya izin verme
+    if contract.status == 'completed':
+        messages.warning(request, 'Bu sözleşme tamamlandıktan sonra artık onaylanamaz.')
+        return redirect('contracts:contract_detail', pk=pk)
 
     if request.method == 'POST':
         approval, created = ContractApproval.objects.get_or_create(
@@ -409,10 +612,28 @@ def contract_approve(request, pk):
 
 @login_required
 def my_contracts(request):
-    """Kullanıcının oluşturduğu sözleşmeler"""
-    contracts = Contract.objects.filter(creator=request.user).order_by('-created_at')
+    """Kullanıcının oluşturduğu ve imzaladığı sözleşmeler"""
+    from django.db.models import Q
+    
+    # Kullanıcının oluşturduğu VEYA imzaladığı sözleşmeler
+    contracts = Contract.objects.filter(
+        Q(creator=request.user) | 
+        Q(signatures__user=request.user, signatures__is_signed=True)
+    ).distinct().order_by('-created_at')
+    
+    # Davet edilen sözleşme sayısı
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     return render(request, 'contracts/my_contracts.html', {
-        'contracts': contracts
+        'contracts': contracts,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
@@ -434,15 +655,26 @@ def signed_contracts(request):
         contract.user_signature = user_signature
         contracts_with_signatures.append(contract)
 
+    # Davet edilen sözleşme sayısı
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     return render(request, 'contracts/signed_contracts.html', {
-        'contracts': contracts_with_signatures
+        'contracts': contracts_with_signatures,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
 @login_required
 def invited_contracts(request):
-    """Kullanıcının davet edildiği sözleşmeler"""
-    # Kullanıcının davet edildiği sözleşmeleri al
+    """Kullanıcının davet edildiği sözleşmeler (henüz imzalamadığı)"""
+    # Kullanıcının davet edildiği ama henüz imzalamadığı sözleşmeleri al
     invited_parties = ContractParty.objects.filter(
         user=request.user,
         invitation_status__in=['pending', 'accepted']
@@ -452,27 +684,81 @@ def invited_contracts(request):
     for party in invited_parties:
         contract = party.contract
 
-        # Sözleşmenin durumunu belirle
+        # Kullanıcının bu sözleşmeyi imzalayıp imzalamadığını kontrol et
         user_signature = contract.signatures.filter(user=request.user).first()
-        user_approval = contract.approvals.filter(user=request.user).first()
+        
+        # Eğer kullanıcı bu sözleşmeyi imzaladıysa, davet edilenler listesinde gösterme
+        if user_signature and user_signature.is_signed:
+            continue
 
         contract.invitation_status = party.invitation_status
         contract.user_party_role = party.get_role_display()
         contract.user_signature = user_signature
-        contract.user_approval = user_approval
         contract.can_sign = user_signature and not user_signature.is_signed
-        contract.can_approve = not user_approval or not user_approval.is_approved
 
         invited_contracts.append(contract)
 
     # Oluşturulma tarihine göre sırala
     invited_contracts.sort(key=lambda x: x.created_at, reverse=True)
 
+    # invited_contracts_count'ı doğru hesapla (sadece pending ve accepted durumdaki sözleşmeler)
+    invited_contracts_count = len([c for c in invited_contracts if c.invitation_status in ['pending', 'accepted']])
+
     return render(request, 'contracts/invited_contracts.html', {
         'contracts': invited_contracts,
         'total_invited': len(invited_contracts),
         'pending_count': len([c for c in invited_contracts if c.invitation_status == 'pending']),
-        'accepted_count': len([c for c in invited_contracts if c.invitation_status == 'accepted'])
+        'accepted_count': len([c for c in invited_contracts if c.invitation_status == 'accepted']),
+        'declined_count': len([c for c in invited_contracts if c.invitation_status == 'declined']),
+        'invited_contracts_count': invited_contracts_count
+    })
+
+
+@login_required
+def declined_contracts(request):
+    """Red edilen sözleşmeler"""
+    # Kullanıcının oluşturduğu ve red edilen sözleşmeler
+    declined_contracts = Contract.objects.filter(
+        creator=request.user,
+        parties__invitation_status='declined'
+    ).distinct().order_by('-parties__declined_at')
+
+    # Her sözleşme için red eden kişi bilgisini ekle
+    contracts_with_decliners = []
+    total_declined_parties = 0
+    parties_with_reason = 0
+    parties_without_reason = 0
+    
+    for contract in declined_contracts:
+        declined_parties = contract.parties.filter(invitation_status='declined')
+        contract.declined_parties = declined_parties
+        contracts_with_decliners.append(contract)
+        
+        # İstatistikleri hesapla
+        for party in declined_parties:
+            total_declined_parties += 1
+            if party.decline_reason:
+                parties_with_reason += 1
+            else:
+                parties_without_reason += 1
+
+    # Davet edilen sözleşme sayısı
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
+    return render(request, 'contracts/declined_contracts.html', {
+        'contracts': contracts_with_decliners,
+        'invited_contracts_count': invited_contracts_count,
+        'total_declined_contracts': len(contracts_with_decliners),
+        'total_declined_parties': total_declined_parties,
+        'parties_with_reason': parties_with_reason,
+        'parties_without_reason': parties_without_reason,
     })
 
 
@@ -485,6 +771,15 @@ def profile(request):
         is_signed=True
     ).count()
 
+    invited_contracts_count = Contract.objects.filter(
+        parties__user=request.user,
+        parties__user__isnull=False,
+        parties__invitation_status__in=['pending', 'accepted']
+    ).exclude(
+        signatures__user=request.user,
+        signatures__is_signed=True
+    ).distinct().count()
+
     context = {
         'user_contracts_count': user_contracts.count(),
         'signed_contracts_count': signed_contracts_count,
@@ -492,6 +787,7 @@ def profile(request):
             user=request.user,
             is_approved=True
         ).count(),
+        'invited_contracts_count': invited_contracts_count,
     }
 
     return render(request, 'contracts/profile.html', context)
@@ -756,9 +1052,21 @@ def contract_pool(request):
             Q(content__icontains=query)
         )
 
+    invited_contracts_count = 0
+    if request.user.is_authenticated:
+        invited_contracts_count = Contract.objects.filter(
+            parties__user=request.user,
+            parties__user__isnull=False,
+            parties__invitation_status__in=['pending', 'accepted']
+        ).exclude(
+            signatures__user=request.user,
+            signatures__is_signed=True
+        ).distinct().count()
+
     return render(request, 'contracts/contract_pool.html', {
         'contracts': contracts,
-        'query': query
+        'query': query,
+        'invited_contracts_count': invited_contracts_count
     })
 
 
@@ -789,6 +1097,73 @@ def send_signature_email(email, contract, code):
     İmza Kodu: {code}
 
     Bu kodu sözleşme sayfasında girerek sözleşmeyi imzalayabilirsiniz.
+
+    sözümSöz Platformu
+    """
+    try:
+        from django.core.mail import send_mail
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+    except:
+        pass  # E-posta hatası olsa bile devam et
+
+
+def send_contract_invitation_email(email, contract, inviter):
+    """Sözleşme daveti e-postası gönder"""
+    subject = f'Sözleşmeye Davet: {contract.title}'
+    message = f"""
+    Merhaba,
+
+    {inviter.get_full_name() or inviter.username} sizi "{contract.title}" sözleşmesine taraf olarak davet etti.
+
+    Sözleşmeyi incelemek ve imzalamak için sözümSöz platformuna giriş yapın:
+    http://localhost:8002/accounts/login/
+
+    Sözleşmeyi görüntülemek için:
+    http://localhost:8002{contract.get_absolute_url()}
+
+    Sözleşme Detayları:
+    - Başlangıç Tarihi: {contract.start_date.strftime('%d.%m.%Y')}
+    - Süre: {contract.duration_display}
+    - Oluşturan: {inviter.get_full_name() or inviter.username}
+
+    sözümSöz Platformu
+    """
+    try:
+        from django.core.mail import send_mail
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+    except:
+        pass  # E-posta hatası olsa bile devam et
+
+
+def send_contract_declined_email(email, contract, decliner, decline_reason=''):
+    """Sözleşme reddetme e-postası gönder"""
+    subject = f'Sözleşme Daveti Reddedildi: {contract.title}'
+    
+    reason_text = ""
+    if decline_reason:
+        reason_text = f"""
+    
+    Red Nedeni:
+    {decline_reason}
+    """
+    
+    message = f"""
+    Merhaba,
+
+    "{contract.title}" sözleşmesi için gönderdiğiniz davet, {decliner.get_full_name() or decliner.username} tarafından reddedildi.{reason_text}
+
+    Sözleşmeyi görüntülemek için:
+    http://localhost:8002{contract.get_absolute_url()}
+
+    Sözleşme Detayları:
+    - Başlangıç Tarihi: {contract.start_date.strftime('%d.%m.%Y')}
+    - Süre: {contract.duration_display}
+    - Davet Reddeden: {decliner.get_full_name() or decliner.username}
+
+    Red edilen sözleşmeleri yönetmek için:
+    http://localhost:8002/contracts/declined/
+
+    Başka bir kullanıcı davet etmek veya sözleşmeyi düzenlemek için platforma giriş yapabilirsiniz.
 
     sözümSöz Platformu
     """
@@ -872,8 +1247,20 @@ def add_contract_party(request, pk):
                 user=user,
                 role=role
             )
+
+            # Sistem kullanıcısı için imza kaydı oluştur
+            signature_code = generate_signature_code()
+            ContractSignature.objects.create(
+                contract=contract,
+                party=party,
+                user=user,
+                signature_code=signature_code
+            )
+
+            # İmza e-postası gönder
+            send_signature_email(user.email, contract, signature_code)
         else:
-            # Manuel giriş ise
+            # Manuel giriş ise (sistem kullanıcısı değil)
             party = ContractParty.objects.create(
                 contract=contract,
                 user=None,

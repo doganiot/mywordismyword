@@ -14,7 +14,7 @@
                     Sözleşmelerim
                 </h1>
                 <p class="lead text-muted">
-                    Oluşturduğunuz tüm sözleşmeleri burada yönetebilirsiniz
+                    Oluşturduğunuz ve imzaladığınız tüm sözleşmeleri burada yönetebilirsiniz
                 </p>
             </div>
 
@@ -78,6 +78,7 @@
                                     <h5 class="card-title fw-bold mb-3">
                                         <a href="{% url 'contracts:contract_detail' pk=contract.pk %}"
                                            class="text-decoration-none text-dark">
+                                            <span class="badge bg-primary me-2">#{{ contract.contract_number }}</span>
                                             {{ contract.title }}
                                         </a>
                                     </h5>
@@ -153,17 +154,19 @@
                                         {% endif %}
                                         <div class="dropdown">
                                             <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
-                                                    type="button" data-bs-toggle="dropdown">
+                                                    type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                                 <i class="fas fa-ellipsis-v"></i>
                                             </button>
-                                            <ul class="dropdown-menu">
+                                            <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1050;">
                                                 <li><a class="dropdown-item" href="{% url 'contracts:contract_pdf' pk=contract.pk %}">
                                                     <i class="fas fa-download me-2"></i>PDF İndir
                                                 </a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteContract({{ contract.pk }})">
-                                                    <i class="fas fa-trash me-2"></i>Sil
-                                                </a></li>
+                                                {% if contract.can_be_deleted %}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteContract({{ contract.pk }})">
+                                                        <i class="fas fa-trash me-2"></i>Sil
+                                                    </a></li>
+                                                {% endif %}
                                             </ul>
                                         </div>
                                     </div>
@@ -213,6 +216,23 @@
 .empty-state {
     max-width: 500px;
     margin: 0 auto;
+}
+
+/* Dropdown z-index düzeltmesi */
+.dropdown-menu {
+    z-index: 1050 !important;
+    position: absolute !important;
+}
+
+/* Kartların z-index'ini düşür */
+.card {
+    position: relative;
+    z-index: 1;
+}
+
+/* Dropdown açıldığında kartın z-index'ini artır */
+.dropdown.show .card {
+    z-index: 2;
 }
 
 @media (max-width: 768px) {

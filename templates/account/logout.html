@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Çıkış Yapıldı - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card auth-card shadow-strong fade-in-up">
+                <div class="card-header auth-header text-center">
+                    <h3 class="mb-0">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        Çıkış Yapıldı
+                    </h3>
+                    <p class="mb-0 mt-2 opacity-75">Güvenli bir şekilde çıkış yaptınız</p>
+                </div>
+                <div class="card-body auth-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                        <h5 class="text-success">Başarıyla çıkış yaptınız!</h5>
+                        <p class="text-muted">
+                            SözümSöz platformundan güvenli bir şekilde çıkış yaptınız.
+                            Tekrar görüşmek üzere!
+                        </p>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'contracts:home' %}" class="btn btn-primary btn-lg hover-lift">
+                            <i class="fas fa-home me-2"></i>
+                            Ana Sayfaya Dön
+                        </a>
+                        <a href="{% url 'account_login' %}" class="btn btn-outline-primary hover-lift">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Tekrar Giriş Yap
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Güvenlik İpucu -->
+            <div class="alert security-info mt-4">
+                <div class="d-flex">
+                    <i class="fas fa-info-circle me-3 mt-1"></i>
+                    <div>
+                        <h6 class="alert-heading mb-1">Güvenlik İpucu</h6>
+                        <small>
+                            Her zaman çıkış yaptıktan sonra tarayıcıyı kapatmanız önerilir.
+                            Böylece oturum bilgileriniz korunmuş olur.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Auto redirect to home page after 3 seconds -->
+<script>
+    setTimeout(function() {
+        window.location.href = "{% url 'contracts:home' %}";
+    }, 3000);
+</script>
+{% endblock %}

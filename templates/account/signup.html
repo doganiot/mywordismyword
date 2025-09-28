@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% load i18n %}
+
+{% block title %}Üye Ol - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card auth-card shadow-strong fade-in-up">
+                <div class="card-header auth-header text-center">
+                    <h3 class="mb-0">
+                        <i class="fas fa-user-plus me-2"></i>
+                        Üye Ol
+                    </h3>
+                    <p class="mb-0 mt-2 opacity-75">SözümSöz ailesine katılın</p>
+                </div>
+                <div class="card-body auth-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="auth-form">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.first_name.id_for_label }}" class="form-label">
+                                    <i class="fas fa-user me-1"></i>
+                                    Ad
+                                </label>
+                                <input type="text" name="{{ form.first_name.name }}" id="{{ form.first_name.id_for_label }}"
+                                       value="{% if form.first_name.value %}{{ form.first_name.value }}{% endif %}"
+                                       class="form-control form-control-lg"
+                                       placeholder="Adınızı girin" required>
+                                {% if form.first_name.errors %}
+                                    <div class="text-danger mt-1">
+                                        <small>{{ form.first_name.errors.0 }}</small>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.last_name.id_for_label }}" class="form-label">
+                                    <i class="fas fa-user me-1"></i>
+                                    Soyad
+                                </label>
+                                <input type="text" name="{{ form.last_name.name }}" id="{{ form.last_name.id_for_label }}"
+                                       value="{% if form.last_name.value %}{{ form.last_name.value }}{% endif %}"
+                                       class="form-control form-control-lg"
+                                       placeholder="Soyadınızı girin" required>
+                                {% if form.last_name.errors %}
+                                    <div class="text-danger mt-1">
+                                        <small>{{ form.last_name.errors.0 }}</small>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.birth_date.id_for_label }}" class="form-label">
+                                    <i class="fas fa-birthday-cake me-1"></i>
+                                    Doğum Tarihi
+                                </label>
+                                <input type="date" name="{{ form.birth_date.name }}" id="{{ form.birth_date.id_for_label }}"
+                                       value="{% if form.birth_date.value %}{{ form.birth_date.value }}{% endif %}"
+                                       class="form-control form-control-lg" required>
+                                {% if form.birth_date.errors %}
+                                    <div class="text-danger mt-1">
+                                        <small>{{ form.birth_date.errors.0 }}</small>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.gender.id_for_label }}" class="form-label">
+                                    <i class="fas fa-venus-mars me-1"></i>
+                                    Cinsiyet
+                                </label>
+                                <select name="{{ form.gender.name }}" id="{{ form.gender.id_for_label }}"
+                                        class="form-select form-select-lg" required>
+                                    <option value="">Seçiniz...</option>
+                                    <option value="M" {% if form.gender.value == 'M' %}selected{% endif %}>Erkek</option>
+                                    <option value="F" {% if form.gender.value == 'F' %}selected{% endif %}>Kadın</option>
+                                    <option value="O" {% if form.gender.value == 'O' %}selected{% endif %}>Diğer</option>
+                                </select>
+                                {% if form.gender.errors %}
+                                    <div class="text-danger mt-1">
+                                        <small>{{ form.gender.errors.0 }}</small>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">
+                                <i class="fas fa-envelope me-1"></i>
+                                E-posta Adresi
+                            </label>
+                            <input type="email" name="{{ form.email.name }}" id="{{ form.email.id_for_label }}"
+                                   value="{% if form.email.value %}{{ form.email.value }}{% endif %}"
+                                   class="form-control form-control-lg"
+                                   placeholder="e-posta@example.com" required>
+                            {% if form.email.errors %}
+                                <div class="text-danger mt-1">
+                                    <small>{{ form.email.errors.0 }}</small>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.password1.id_for_label }}" class="form-label">
+                                    <i class="fas fa-lock me-1"></i>
+                                    Şifre
+                                </label>
+                                <input type="password" name="{{ form.password1.name }}" id="{{ form.password1.id_for_label }}"
+                                       class="form-control form-control-lg"
+                                       placeholder="Güçlü bir şifre oluşturun" required>
+                                {% if form.password1.errors %}
+                                    <div class="text-danger mt-1">
+                                        <small>{{ form.password1.errors.0 }}</small>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.password2.id_for_label }}" class="form-label">
+                                    <i class="fas fa-lock me-1"></i>
+                                    Şifre Tekrar
+                                </label>
+                                <input type="password" name="{{ form.password2.name }}" id="{{ form.password2.id_for_label }}"
+                                       class="form-control form-control-lg"
+                                       placeholder="Şifrenizi tekrar girin" required>
+                                {% if form.password2.errors %}
+                                    <div class="text-danger mt-1">
+                                        <small>{{ form.password2.errors.0 }}</small>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" name="{{ form.agree_terms.name }}" id="{{ form.agree_terms.id_for_label }}"
+                                       class="form-check-input" {% if form.agree_terms.value %}checked{% endif %} required>
+                                <label for="{{ form.agree_terms.id_for_label }}" class="form-check-label">
+                                    <small>
+                                        <a href="#" class="text-primary">Kullanım Koşullarını</a> ve
+                                        <a href="#" class="text-primary">Gizlilik Politikasını</a> kabul ediyorum.
+                                    </small>
+                                </label>
+                            </div>
+                            {% if form.agree_terms.errors %}
+                                <div class="text-danger mt-1">
+                                    <small>{{ form.agree_terms.errors.0 }}</small>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg hover-lift">
+                                <i class="fas fa-user-plus me-2"></i>
+                                Üye Ol
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center mb-3">
+                        <p class="mb-2">Zaten hesabınız var mı?</p>
+                        <a href="{% url 'account_login' %}" class="btn btn-outline-primary hover-lift">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            Giriş Yapın
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Özellikler -->
+            <div class="row mt-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card feature-card bg-gradient-success text-white h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shield-alt fa-2x mb-2"></i>
+                            <h6>Güvenli</h6>
+                            <small>SSL koruması ile güvenli</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card feature-card bg-gradient-primary text-white h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-file-contract fa-2x mb-2"></i>
+                            <h6>Kolay</h6>
+                            <small>Hızlı sözleşme oluşturma</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card feature-card bg-gradient-warning text-white h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <h6>Sosyal</h6>
+                            <small>Topluluk desteği</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

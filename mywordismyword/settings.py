@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-&1g-)w_+2$l#rj%0(x@s^vv3x0oh%b#)en)d@1uqnc1e6_#kzp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 
 # Application definition
@@ -79,6 +79,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
+                'contracts.context_processors.declined_contracts_count',
             ],
         },
     },

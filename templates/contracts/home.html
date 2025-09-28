@@ -4,6 +4,17 @@
 {% block title %}Ana Sayfa - sözümSöz{% endblock %}
 
 {% block content %}
+
+<!-- Sözleşme Daveti Uyarısı -->
+{% if user.is_authenticated and invited_contracts_count > 0 %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <i class="fas fa-envelope me-2"></i>
+    <strong>{{ invited_contracts_count }} yeni sözleşme davetiniz var!</strong>
+    <a href="{% url 'contracts:invited_contracts' %}" class="alert-link">Davet edildiğim sözleşmeleri görüntüle</a>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+</div>
+{% endif %}
+
 <!-- Hero Section -->
 <section class="hero bg-primary text-white py-5">
     <div class="container">
@@ -27,9 +38,15 @@
                         </a>
                     </div>
                 {% else %}
-                    <a href="{% url 'contracts:contract_create' %}" class="btn btn-light btn-lg">
-                        <i class="fas fa-plus"></i> İlk Sözleşmenizi Oluşturun
-                    </a>
+                    {% if total_contracts == 0 %}
+                        <a href="{% url 'contracts:contract_create' %}" class="btn btn-light btn-lg">
+                            <i class="fas fa-plus"></i> İlk Sözleşmenizi Oluşturun
+                        </a>
+                    {% else %}
+                        <a href="{% url 'contracts:contract_create' %}" class="btn btn-light btn-lg">
+                            <i class="fas fa-plus"></i> Yeni Sözleşme Oluşturun
+                        </a>
+                    {% endif %}
                 {% endif %}
             </div>
             <div class="col-lg-6">
@@ -149,6 +166,7 @@
                         <div class="card-body">
                             <h6 class="card-title fw-bold">
                                 <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="text-decoration-none">
+                                    <span class="badge bg-primary me-2">#{{ contract.contract_number }}</span>
                                     {{ contract.title }}
                                 </a>
                             </h6>
@@ -187,6 +205,7 @@
                         <div class="card-body">
                             <h6 class="card-title fw-bold">
                                 <a href="{% url 'contracts:contract_detail' pk=contract.pk %}" class="text-decoration-none">
+                                    <span class="badge bg-primary me-2">#{{ contract.contract_number }}</span>
                                     {{ contract.title }}
                                 </a>
                             </h6>
@@ -219,9 +238,15 @@
                 <i class="fas fa-rocket"></i> Ücretsiz Kayıt Ol
             </a>
         {% else %}
-            <a href="{% url 'contracts:contract_create' %}" class="btn btn-light btn-lg">
-                <i class="fas fa-plus"></i> Sözleşme Oluştur
-            </a>
+            {% if total_contracts == 0 %}
+                <a href="{% url 'contracts:contract_create' %}" class="btn btn-light btn-lg">
+                    <i class="fas fa-plus"></i> İlk Sözleşmenizi Oluşturun
+                </a>
+            {% else %}
+                <a href="{% url 'contracts:contract_create' %}" class="btn btn-light btn-lg">
+                    <i class="fas fa-plus"></i> Yeni Sözleşme Oluşturun
+                </a>
+            {% endif %}
         {% endif %}
     </div>
 </section>

@@ -7,6 +7,16 @@
 <div class="container py-5">
     <div class="row">
         <div class="col-12">
+            <!-- Uyarı Mesajı -->
+            {% if contracts %}
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="fas fa-bell me-2"></i>
+                <strong>Yeni Davetler!</strong> Aşağıda taraf olduğunuz sözleşmeler listelenmiştir.
+                Sözleşmeleri inceleyip imzalayabilirsiniz.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Kapat"></button>
+            </div>
+            {% endif %}
+
             <!-- Başlık -->
             <div class="text-center mb-5">
                 <h1 class="display-4 fw-bold text-primary">
@@ -14,13 +24,13 @@
                     Davet Edildiğim Sözleşmeler
                 </h1>
                 <p class="lead text-muted">
-                    Size gönderilen sözleşmeleri burada görebilir ve yönetebilirsiniz
+                    Size gönderilen ve henüz imzalamadığınız sözleşmeleri burada görebilir ve yönetebilirsiniz
                 </p>
             </div>
 
             <!-- İstatistikler -->
             <div class="row mb-4">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card bg-light border-0">
                         <div class="card-body text-center">
                             <div class="h1 text-primary">{{ total_invited }}</div>
@@ -28,7 +38,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card bg-warning border-0">
                         <div class="card-body text-center">
                             <div class="h1 text-white">{{ pending_count }}</div>
@@ -36,11 +46,19 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card bg-success border-0">
                         <div class="card-body text-center">
                             <div class="h1 text-white">{{ accepted_count }}</div>
                             <div class="text-white">Kabul Edilen</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger border-0">
+                        <div class="card-body text-center">
+                            <div class="h1 text-white">{{ declined_count }}</div>
+                            <div class="text-white">Reddedilen</div>
                         </div>
                     </div>
                 </div>
@@ -124,17 +142,6 @@
                                             {% endif %}
                                         {% endif %}
 
-                                        <!-- Onay Durumu -->
-                                        {% if contract.user_approval %}
-                                            {% if contract.user_approval.is_approved %}
-                                                <div class="alert alert-info py-2 mb-2">
-                                                    <small>
-                                                        <i class="fas fa-thumbs-up me-1"></i>
-                                                        {{ contract.user_approval.approved_at|date:"d.m.Y H:i" }} tarihinde onaylandı
-                                                    </small>
-                                                </div>
-                                            {% endif %}
-                                        {% endif %}
                                     </div>
 
                                     <!-- Aksiyon Butonları -->
@@ -144,19 +151,39 @@
                                             <i class="fas fa-eye me-1"></i>Görüntüle
                                         </a>
 
-                                        {% if contract.can_approve %}
-                                            <button class="btn btn-outline-success btn-sm"
-                                                    onclick="approveContract('{{ contract.pk }}')">
-                                                <i class="fas fa-thumbs-up me-1"></i>Onayla
-                                            </button>
-                                        {% endif %}
+                                        <div class="d-flex gap-2">
+                                            {% if contract.can_sign %}
+                                                <a href="{% url 'contracts:contract_sign' pk=contract.pk %}"
+                                                   class="btn btn-success btn-sm">
+                                                    <i class="fas fa-signature me-1"></i>İmzala
+                                                </a>
+                                            {% endif %}
 
-                                        {% if contract.can_sign %}
-                                            <a href="{% url 'contracts:contract_sign' pk=contract.pk %}"
-                                               class="btn btn-success btn-sm">
-                                                <i class="fas fa-signature me-1"></i>İmzala
-                                            </a>
-                                        {% endif %}
+                                            <div class="dropdown">
+                                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                                        type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="fas fa-ellipsis-v"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1050;">
+                                                    <li><a class="dropdown-item" href="{% url 'contracts:contract_pdf' pk=contract.pk %}">
+                                                        <i class="fas fa-download me-2"></i>PDF İndir
+                                                    </a></li>
+                                                    {% if contract.invitation_status == 'pending' %}
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li>
+                                                            <form method="post" action="{% url 'contracts:contract_decline' pk=contract.pk %}"
+                                                                  class="d-inline"
+                                                                  onsubmit="return confirm('Bu sözleşme davetini reddetmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="dropdown-item text-danger">
+                                                                    <i class="fas fa-times me-2"></i>Reddet
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    {% endif %}
+                                                </ul>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -183,31 +210,6 @@
     </div>
 </div>
 
-<!-- Onay Modal -->
-<div class="modal fade" id="approveModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fas fa-thumbs-up me-2"></i>Sözleşmeyi Onayla
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Bu sözleşmeyi onaylamak istediğinizden emin misiniz?</p>
-                <p class="text-muted small">
-                    Onayladıktan sonra sözleşme şartlarını kabul etmiş olursunuz.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-success" id="confirmApprove">
-                    <i class="fas fa-check me-1"></i>Onayla
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <style>
 .hover-lift {
@@ -236,44 +238,23 @@
     border: none;
     border-radius: 8px;
 }
-</style>
 
-<script>
-let currentContractId = null;
-
-function approveContract(contractId) {
-    currentContractId = contractId;
-    const modal = new bootstrap.Modal(document.getElementById('approveModal'));
-    modal.show();
+/* Dropdown z-index düzeltmesi */
+.dropdown-menu {
+    z-index: 1050 !important;
+    position: absolute !important;
 }
 
-// Onay butonuna tıklandığında
-document.getElementById('confirmApprove')?.addEventListener('click', function() {
-    if (!currentContractId) return;
+/* Kartların z-index'ini düşür */
+.card {
+    position: relative;
+    z-index: 1;
+}
 
-    // Onay işlemini gerçekleştir
-    fetch(`/${currentContractId}/approve/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: ''
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Modal'ı kapat ve sayfayı yenile
-            bootstrap.Modal.getInstance(document.getElementById('approveModal')).hide();
-            location.reload();
-        } else {
-            alert('Hata: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Approval error:', error);
-        alert('Onay işlemi sırasında bir hata oluştu.');
-    });
-});
-</script>
+/* Dropdown açıldığında kartın z-index'ini artır */
+.dropdown.show .card {
+    z-index: 2;
+}
+</style>
+
 {% endblock %}

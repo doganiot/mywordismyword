@@ -112,30 +112,107 @@
                                 </small>
                             </div>
 
-                            <!-- 2. Taraf (İsteğe Bağlı) -->
+                            <!-- 2. Taraf Seçimi -->
                             <div class="mb-3">
-                                <label for="second_party" class="form-label text-muted">2. Taraf (İsteğe Bağlı)</label>
-                                <div class="position-relative">
-                                    <input type="text" class="form-control" id="second_party_search"
-                                           placeholder="Kullanıcı ara... (isim veya e-posta)">
-                                    <select class="form-select position-absolute" id="second_party" name="second_party"
-                                            style="top: 0; left: 0; opacity: 0; pointer-events: none;">
-                                        <option value="">-- 2. Taraf Seçin (İsteğe Bağlı) --</option>
-                                        {% for other_user in other_users %}
-                                            <option value="{{ other_user.id }}"
-                                                    data-name="{{ other_user.get_full_name|default:other_user.username }}"
-                                                    data-email="{{ other_user.email }}">
-                                                {{ other_user.get_full_name|default:other_user.username }} ({{ other_user.email }})
-                                            </option>
-                                        {% endfor %}
-                                    </select>
+                                <label class="form-label text-muted">2. Taraf Seçimi</label>
+
+                                <!-- Vicdan Sözleşmesi Seçeneği -->
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="contract_type" id="self_contract" value="self">
+                                        <label class="form-check-label fw-bold" for="self_contract">
+                                            <i class="fas fa-heart text-danger me-2"></i>
+                                            Vicdan Sözleşmesi
+                                        </label>
+                                    </div>
+                                    <small class="form-text text-muted">
+                                        Sadece kendinizi bağlayan kişisel sözleşme oluşturun. Tek imza ile tamamlanır ve sadece sizin sayfanızda görünür.
+                                    </small>
                                 </div>
-                                <div id="user_results" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem;">
-                                    <!-- Arama sonuçları buraya gelecek -->
+
+                                <!-- Diğer Kullanıcı Seçimi -->
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="contract_type" id="other_party" value="other" checked>
+                                        <label class="form-check-label fw-bold" for="other_party">
+                                            <i class="fas fa-users me-2"></i>
+                                            Diğer Kişi ile Sözleşme
+                                        </label>
+                                    </div>
+                                    <div id="other_party_section" class="ms-4">
+                                        <label for="second_party" class="form-label text-muted small">2. Taraf (İsteğe Bağlı)</label>
+                                        <div class="position-relative">
+                                            <input type="text" class="form-control" id="second_party_search"
+                                                   placeholder="Kullanıcı ara... (isim veya e-posta)">
+                                            <select class="form-select position-absolute" id="second_party" name="second_party"
+                                                    style="top: 0; left: 0; opacity: 0; pointer-events: none;">
+                                                <option value="">-- 2. Taraf Seçin (İsteğe Bağlı) --</option>
+                                                {% for other_user in other_users %}
+                                                    <option value="{{ other_user.id }}"
+                                                            data-name="{{ other_user.get_full_name|default:other_user.username }}"
+                                                            data-email="{{ other_user.email }}">
+                                                        {{ other_user.get_full_name|default:other_user.username }} ({{ other_user.email }})
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div id="user_results" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem;">
+                                            <!-- Arama sonuçları buraya gelecek -->
+                                        </div>
+                                        <small class="form-text text-muted">
+                                            Sözleşmenin diğer tarafını sistemdeki kullanıcılar arasından seçebilirsiniz.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sözleşme Zamanlaması -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-calendar me-1"></i>
+                                Sözleşme Zamanlaması
+                            </label>
+
+                            <!-- Başlangıç Tarihi -->
+                            <div class="mb-3">
+                                <label for="start_date" class="form-label">Başlangıç Tarihi *</label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" required>
+                                <div class="form-text">
+                                    Sözleşmenin yürürlüğe gireceği tarih.
+                                </div>
+                            </div>
+
+                            <!-- Süre Seçenekleri -->
+                            <div class="mb-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="is_indefinite" name="is_indefinite">
+                                    <label class="form-check-label fw-bold" for="is_indefinite">
+                                        Süresiz Sözleşme
+                                    </label>
                                 </div>
                                 <small class="form-text text-muted">
-                                    Sözleşmenin diğer tarafını sistemdeki kullanıcılar arasından seçebilirsiniz.
+                                    İşaretlerseniz sözleşme süresi olmayacak, süresiz olarak geçerli kalacaktır.
                                 </small>
+                            </div>
+
+                            <!-- Sözleşme Süresi -->
+                            <div class="mb-3" id="duration_section">
+                                <label for="duration_months" class="form-label">Sözleşme Süresi (Ay) *</label>
+                                <select class="form-select" id="duration_months" name="duration_months">
+                                    <option value="">-- Süre Seçin --</option>
+                                    <option value="1">1 Ay</option>
+                                    <option value="3">3 Ay</option>
+                                    <option value="6">6 Ay</option>
+                                    <option value="12">1 Yıl</option>
+                                    <option value="24">2 Yıl</option>
+                                    <option value="36">3 Yıl</option>
+                                    <option value="60">5 Yıl</option>
+                                    <option value="120">10 Yıl</option>
+                                </select>
+                                <div class="form-text">
+                                    Sözleşmenin kaç ay süreceğini belirtin.
+                                </div>
                             </div>
                         </div>
 
@@ -300,6 +377,48 @@ document.addEventListener('DOMContentLoaded', function() {
     const templateOptions = document.querySelectorAll('.template-option');
     const contentTextarea = document.getElementById('content');
     const contractForm = document.getElementById('contractForm');
+
+    // Sözleşme türü seçimi
+    const contractTypeRadios = document.querySelectorAll('input[name="contract_type"]');
+    const otherPartySection = document.getElementById('other_party_section');
+    const secondPartySearch = document.getElementById('second_party_search');
+    const secondPartySelect = document.getElementById('second_party');
+
+    // Sözleşme süresi seçimi
+    const isIndefiniteCheckbox = document.getElementById('is_indefinite');
+    const durationSection = document.getElementById('duration_section');
+    const durationSelect = document.getElementById('duration_months');
+
+    // Süresiz sözleşme değiştiğinde
+    isIndefiniteCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            // Süresiz sözleşme seçildi
+            durationSection.style.display = 'none';
+            durationSelect.required = false;
+            durationSelect.value = '';
+        } else {
+            // Süreli sözleşme seçildi
+            durationSection.style.display = 'block';
+            durationSelect.required = true;
+        }
+    });
+
+    // Sözleşme türü değiştiğinde
+    contractTypeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'self') {
+                // Vicdan sözleşmesi seçildi
+                otherPartySection.style.display = 'none';
+                secondPartySearch.value = '';
+                secondPartySelect.value = '';
+                // Görünürlük ayarını otomatik private yap
+                document.getElementById('private').checked = true;
+            } else {
+                // Diğer kişi ile sözleşme seçildi
+                otherPartySection.style.display = 'block';
+            }
+        });
+    });
 
     // Kullanıcı arama özelliği
     const searchInput = document.getElementById('second_party_search');
