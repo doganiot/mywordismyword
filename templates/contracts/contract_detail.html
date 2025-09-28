@@ -307,6 +307,13 @@
                         </a>
                     {% endif %}
 
+                    <!-- Red Etme Butonu -->
+                    {% if user_party and user_party.invitation_status == 'pending' %}
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#declineModal">
+                            <i class="fas fa-times me-1"></i> Daveti Reddet
+                        </button>
+                    {% endif %}
+
 
                     {% if user.is_authenticated and contract.creator == user %}
                         <button class="btn btn-outline-secondary" onclick="showAddPartyModal()">
@@ -501,6 +508,88 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Red Etme Modal -->
+<div class="modal fade" id="declineModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-times me-2"></i>
+                    Sözleşme Davetini Reddet
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Sözleşme Özeti -->
+                <div class="text-center mb-4">
+                    <h6 class="fw-bold">{{ contract.title }}</h6>
+                    <p class="text-muted">{{ contract.creator.get_full_name|default:contract.creator.username }} tarafından oluşturuldu</p>
+                </div>
+
+                <!-- Uyarı -->
+                <div class="alert alert-warning mb-4">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Dikkat!</strong> Bu sözleşme davetini reddettiğinizde, sözleşme oluşturucusuna bildirim gönderilecek ve bu işlem geri alınamaz.
+                </div>
+
+                <!-- Sözleşme Bilgileri -->
+                <div class="mb-4">
+                    <h6 class="fw-bold mb-3">Sözleşme Bilgileri</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Başlangıç Tarihi</small>
+                            <br>
+                            <span class="fw-bold">{{ contract.start_date|date:"d.m.Y" }}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Süre</small>
+                            <br>
+                            <span class="fw-bold">{{ contract.duration_display }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Red Nedeni Formu -->
+                <form id="declineForm" method="post" action="{% url 'contracts:contract_decline' pk=contract.pk %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="decline_reason" class="form-label fw-bold">
+                            <i class="fas fa-comment me-1"></i>
+                            Red Nedeni (İsteğe Bağlı)
+                        </label>
+                        <textarea class="form-control" id="decline_reason" name="decline_reason" 
+                                  rows="4" placeholder="Sözleşmeyi neden reddettiğinizi belirtin... (isteğe bağlı)"
+                                  maxlength="500"></textarea>
+                        <div class="form-text">
+                            Red nedeniniz sözleşme oluşturucusuna bildirilecektir. Bu bilgi sözleşmeyi düzenlemenize yardımcı olacaktır.
+                        </div>
+                        <div class="form-text text-muted">
+                            <small>Maksimum 500 karakter</small>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <p class="text-muted mb-4">
+                            Bu sözleşme davetini gerçekten reddetmek istiyor musunuz?
+                        </p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-arrow-left me-1"></i>
+                    Vazgeç
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeclineBtn">
+                    <i class="fas fa-times me-1"></i>
+                    Daveti Reddet
+                </button>
             </div>
         </div>
     </div>
@@ -784,6 +873,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Button'u tekrar aktif et
                 commentSubmitBtn.disabled = false;
                 commentSubmitBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Gönder';
+            });
+        });
+    }
+});
+
+// Red etme modal JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmDeclineBtn = document.getElementById('confirmDeclineBtn');
+    const declineForm = document.getElementById('declineForm');
+    const declineReason = document.getElementById('decline_reason');
+    
+    if (confirmDeclineBtn && declineForm) {
+        confirmDeclineBtn.addEventListener('click', function() {
+            const content = declineReason.value.trim();
+            
+            // Button'u disable et
+            confirmDeclineBtn.disabled = true;
+            confirmDeclineBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Reddediliyor...';
+            
+            // FormData oluştur
+            const formData = new FormData();
+            formData.append('decline_reason', content);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            // AJAX isteği
+            fetch(declineForm.action, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response;
+            })
+            .then(response => {
+                // Başarılı red etme - sayfayı yenile
+                showSuccessMessage('Sözleşme daveti başarıyla reddedildi!');
+                
+                // Modal'ı kapat
+                const modal = bootstrap.Modal.getInstance(document.getElementById('declineModal'));
+                modal.hide();
+                
+                // Sayfayı yenile
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorMessage('Red etme işlemi sırasında bir hata oluştu.');
+            })
+            .finally(() => {
+                // Button'u tekrar aktif et
+                confirmDeclineBtn.disabled = false;
+                confirmDeclineBtn.innerHTML = '<i class="fas fa-times me-1"></i> Daveti Reddet';
             });
         });
     }
