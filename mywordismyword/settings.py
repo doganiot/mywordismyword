@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
 
     # Third party apps
+    'corsheaders',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -54,6 +55,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -220,6 +222,34 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Static files
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
+]
+
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8002",
+    "http://127.0.0.1:8002",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Sadece development için
+
+# Security headers
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# CSRF settings
+CSRF_COOKIE_SECURE = False  # Development için
+CSRF_COOKIE_HTTPONLY = False
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8002",
+    "http://127.0.0.1:8002",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 # Login/Logout URLs

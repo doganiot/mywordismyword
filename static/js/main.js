@@ -495,10 +495,13 @@ function createToastContainer() {
  */
 function apiCall(url, options = {}) {
     const defaultOptions = {
+        method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
         },
+        credentials: 'same-origin',
+        mode: 'same-origin',
     };
 
     return fetch(url, { ...defaultOptions, ...options })
@@ -511,6 +514,7 @@ function apiCall(url, options = {}) {
         .catch(error => {
             console.error('API call failed:', error);
             showErrorMessage('Bir hata oluştu. Lütfen tekrar deneyin.');
+            throw error; // Re-throw to allow calling code to handle
         });
 }
 

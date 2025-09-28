@@ -243,13 +243,13 @@
 
                     {% if user.is_authenticated %}
                         <div class="mt-4">
-                            <form method="post" action="{% url 'contracts:add_contract_comment' pk=contract.pk %}">
+                            <form id="commentForm" method="post" action="{% url 'contracts:add_contract_comment' pk=contract.pk %}">
                                 {% csrf_token %}
                                 <div class="mb-3">
                                     <label for="commentContent" class="form-label">Yorumunuz</label>
                                     <textarea class="form-control" id="commentContent" name="content" rows="3" required></textarea>
                                 </div>
-                                <button type="submit" class="btn btn-primary">
+                                <button type="submit" class="btn btn-primary" id="commentSubmitBtn">
                                     <i class="fas fa-paper-plane me-1"></i> Gönder
                                 </button>
                             </form>
@@ -699,6 +699,94 @@ document.getElementById('addPartyForm')?.addEventListener('submit', function(e) 
             alert('Hata: ' + data.message);
         }
     });
+});
+
+// Yorum ekleme AJAX
+document.addEventListener('DOMContentLoaded', function() {
+    const commentForm = document.getElementById('commentForm');
+    const commentContent = document.getElementById('commentContent');
+    const commentSubmitBtn = document.getElementById('commentSubmitBtn');
+    
+    if (commentForm) {
+        commentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const content = commentContent.value.trim();
+            if (!content) {
+                alert('Lütfen yorum içeriği girin.');
+                return;
+            }
+            
+            // Button'u disable et
+            commentSubmitBtn.disabled = true;
+            commentSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Gönderiliyor...';
+            
+            // FormData oluştur
+            const formData = new FormData();
+            formData.append('content', content);
+            formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            // AJAX isteği
+            fetch(commentForm.action, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Yorumu sayfaya ekle
+                    const commentsContainer = document.querySelector('.card-body');
+                    const commentHtml = `
+                        <div class="comment mb-3 p-3 border rounded">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>${data.comment.user}</strong>
+                                    <small class="text-muted ms-2">${data.comment.created_at}</small>
+                                </div>
+                            </div>
+                            <p class="mb-0 mt-2">${data.comment.content}</p>
+                        </div>
+                    `;
+                    
+                    // Eğer "Henüz yorum yapılmamış" mesajı varsa kaldır
+                    const noCommentsMsg = commentsContainer.querySelector('.text-muted.text-center');
+                    if (noCommentsMsg) {
+                        noCommentsMsg.remove();
+                    }
+                    
+                    // Yorumu ekle
+                    const formElement = commentForm.parentElement;
+                    formElement.insertAdjacentHTML('beforebegin', commentHtml);
+                    
+                    // Form'u temizle
+                    commentContent.value = '';
+                    
+                    // Başarı mesajı
+                    showSuccessMessage('Yorumunuz başarıyla eklendi!');
+                } else {
+                    showErrorMessage(data.message || 'Yorum eklenirken bir hata oluştu.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorMessage('Yorum eklenirken bir hata oluştu.');
+            })
+            .finally(() => {
+                // Button'u tekrar aktif et
+                commentSubmitBtn.disabled = false;
+                commentSubmitBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Gönder';
+            });
+        });
+    }
 });
 </script>
 {% endblock %}
