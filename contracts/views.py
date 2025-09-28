@@ -1195,14 +1195,14 @@ def verify_signature_code(request, pk):
                 signature.ip_address = get_client_ip(request)
                 signature.save()
 
-                return JsonResponse({'success': True, 'message': 'İmza doğrulandı!'})
+                return JsonResponse({'success': True, 'message': 'İmza doğrulandı!'}, json_dumps_params={'ensure_ascii': False})
             else:
-                return JsonResponse({'success': False, 'message': 'Zaten imzalanmış.'})
+                return JsonResponse({'success': False, 'message': 'Zaten imzalanmış.'}, json_dumps_params={'ensure_ascii': False})
 
         except ContractSignature.DoesNotExist:
-            return JsonResponse({'success': False, 'message': 'Geçersiz kod.'})
+            return JsonResponse({'success': False, 'message': 'Geçersiz kod.'}, json_dumps_params={'ensure_ascii': False})
 
-    return JsonResponse({'success': False, 'message': 'Geçersiz istek.'})
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek.'}, json_dumps_params={'ensure_ascii': False})
 
 
 @login_required
@@ -1311,9 +1311,9 @@ def add_contract_party(request, pk):
             'success': True,
             'message': 'Taraf eklendi ve davet gönderildi!',
             'invitation_sent': True
-        })
+        }, json_dumps_params={'ensure_ascii': False})
 
-        return JsonResponse({'success': False, 'message': 'Geçersiz istek.'})
+        return JsonResponse({'success': False, 'message': 'Geçersiz istek.'}, json_dumps_params={'ensure_ascii': False})
 
 
 @login_required
@@ -1323,7 +1323,7 @@ def search_users(request):
         query = request.GET.get('q', '').strip()
 
         if len(query) < 2:
-            return JsonResponse({'success': False, 'message': 'Arama sorgusu çok kısa.'})
+            return JsonResponse({'success': False, 'message': 'Arama sorgusu çok kısa.'}, json_dumps_params={'ensure_ascii': False})
 
         # Kullanıcıları ara (ad soyad veya e-posta ile)
         users = User.objects.filter(
@@ -1346,9 +1346,9 @@ def search_users(request):
             'success': True,
             'users': user_list,
             'count': len(user_list)
-        })
+        }, json_dumps_params={'ensure_ascii': False})
 
-    return JsonResponse({'success': False, 'message': 'Geçersiz istek.'})
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek.'}, json_dumps_params={'ensure_ascii': False})
 
 
 @login_required
@@ -1366,7 +1366,7 @@ def add_contract_comment(request, pk):
         )
 
         if not has_access:
-            return JsonResponse({'success': False, 'message': 'Erişim yetkiniz yok.'})
+            return JsonResponse({'success': False, 'message': 'Erişim yetkiniz yok.'}, json_dumps_params={'ensure_ascii': False})
 
         comment = ContractComment.objects.create(
             contract=contract,
@@ -1381,6 +1381,6 @@ def add_contract_comment(request, pk):
                 'content': content,
                 'created_at': comment.created_at.strftime('%d.%m.%Y %H:%M')
             }
-        })
+        }, json_dumps_params={'ensure_ascii': False})
 
-    return JsonResponse({'success': False, 'message': 'Geçersiz istek.'})
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek.'}, json_dumps_params={'ensure_ascii': False})
