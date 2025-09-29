@@ -59,10 +59,13 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'contracts:declined_contracts' %}">
+                            <a class="nav-link position-relative" href="{% url 'contracts:declined_contracts' %}">
                                 <i class="fas fa-times-circle"></i> Red Edilenler
                                 {% if declined_contracts_count > 0 %}
                                     <span class="badge bg-danger ms-1">{{ declined_contracts_count }}</span>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark" style="font-size: 0.6rem;">
+                                        {{ declined_contracts_count }}
+                                    </span>
                                 {% endif %}
                             </a>
                         </li>
@@ -78,6 +81,9 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'contracts:profile' %}">
                                     <i class="fas fa-user-circle"></i> Profil
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'contracts:my_templates' %}">
+                                    <i class="fas fa-file-alt"></i> Şablonlarım
                                 </a></li>
                                 <li><a class="dropdown-item" href="{% url 'contracts:signed_contracts' %}">
                                     <i class="fas fa-signature"></i> İmzalananlar
@@ -165,15 +171,35 @@
             box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
         }
         
+        /* Üst badge stili - daha dikkat çekici */
+        .nav-link .badge.bg-warning {
+            background-color: #ffc107 !important;
+            color: #000 !important;
+            box-shadow: 0 0 8px rgba(255, 193, 7, 0.8);
+            animation: pulse-warning 1.5s infinite;
+            z-index: 1000;
+        }
+        
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
         
+        @keyframes pulse-warning {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
         .nav-link:hover .badge {
             animation: none;
             transform: scale(1.1);
+        }
+        
+        .nav-link:hover .badge.bg-warning {
+            animation: none;
+            transform: scale(1.2);
         }
     </style>
 

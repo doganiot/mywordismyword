@@ -19,7 +19,14 @@ class ContractTemplate(models.Model):
         ('cooking', 'Yemek Sözleşmesi'),
         ('household', 'Ev İşleri Sözleşmesi'),
         ('delivery', 'Teslimat Sözleşmesi'),
+        ('company', 'Şirket Sözleşmeleri'),
         ('custom', 'Özel Sözleşme'),
+    ]
+
+    VISIBILITY_CHOICES = [
+        ('private', 'Gizli'),
+        ('public', 'Halka Açık'),
+        ('shared', 'Paylaşımlı'),
     ]
 
     title = models.CharField(max_length=200, verbose_name="Şablon Başlığı")
@@ -27,6 +34,16 @@ class ContractTemplate(models.Model):
     description = models.TextField(verbose_name="Açıklama")
     content = models.TextField(verbose_name="Şablon İçeriği")
     is_active = models.BooleanField(default=True, verbose_name="Aktif")
+    
+    # Kullanıcı sahipliği
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_templates', verbose_name="Oluşturan", null=True, blank=True)
+    visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default='private', verbose_name="Görünürlük")
+    is_system_template = models.BooleanField(default=False, verbose_name="Sistem Şablonu", help_text="Sistem tarafından oluşturulan şablon")
+    
+    # Paylaşım bilgileri
+    share_code = models.CharField(max_length=20, unique=True, null=True, blank=True, verbose_name="Paylaşım Kodu")
+    shared_at = models.DateTimeField(null=True, blank=True, verbose_name="Paylaşım Tarihi")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -37,6 +54,26 @@ class ContractTemplate(models.Model):
 
     def __str__(self):
         return self.title
+    
+    def save(self, *args, **kwargs):
+        # Eğer sistem şablonu değilse ve creator yoksa, hata ver
+        if not self.is_system_template and not self.creator:
+            raise ValueError("Kullanıcı şablonları için creator gerekli")
+        
+        # Paylaşım kodu oluştur
+        if self.visibility == 'shared' and not self.share_code:
+            import random
+            import string
+            self.share_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            self.shared_at = timezone.now()
+        
+        super().save(*args, **kwargs)
+    
+    def get_share_url(self, request):
+        """Paylaşım URL'sini döndür"""
+        if self.visibility == 'shared' and self.share_code:
+            return request.build_absolute_uri(f'/templates/share/{self.share_code}/')
+        return None
 
 
 class Contract(models.Model):
@@ -187,6 +224,82 @@ class Contract(models.Model):
             raise ValueError("Bu sözleşme tamamlandıktan sonra değiştirilemez veya silinemez.")
         return True
 
+    def get_content_with_signatures(self):
+        """Sözleşme içeriğini imzalayanların isimleri ile güncelle"""
+        content = self.content
+        
+        # İmzalayanları al
+        signed_parties = self.signatures.filter(is_signed=True).select_related('party', 'user')
+        
+        if not signed_parties.exists():
+            return content
+        
+        # İmzalayan isimlerini ve tarihlerini al
+        signers = []
+        for signature in signed_parties:
+            signer_name = signature.party.display_name if signature.party else signature.user.get_full_name() or signature.user.username
+            signed_date = signature.signed_at.strftime('%d.%m.%Y') if signature.signed_at else '_________________'
+            signers.append((signer_name, signed_date))
+        
+        # Placeholder'ları değiştir
+        import re
+        
+        # İMZALAR bölümünü bul ve değiştir
+        imza_pattern = r'(\[İmza Alanı[^\]]*\])'
+        ad_pattern = r'(\[Ad[^\]]*\])'
+        tarih_pattern = r'(\[Tarih[^\]]*\])'
+        
+        # Özel ad pattern'leri
+        ad_soyad_pattern = r'(\[Ad Soyad[^\]]*\])'
+        ad_sirket_pattern = r'(\[Ad/Şirket Adı[^\]]*\])'
+        
+        # İmza alanlarını değiştir
+        imza_matches = list(re.finditer(imza_pattern, content))
+        for i, match in enumerate(imza_matches):
+            if i < len(signers):
+                signer_name, _ = signers[i]
+                content = content.replace(match.group(1), f'✓ İmzalandı - {signer_name}', 1)
+            else:
+                content = content.replace(match.group(1), '_________________', 1)
+        
+        # Ad alanlarını değiştir
+        ad_matches = list(re.finditer(ad_pattern, content))
+        for i, match in enumerate(ad_matches):
+            if i < len(signers):
+                signer_name, _ = signers[i]
+                content = content.replace(match.group(1), signer_name, 1)
+            else:
+                content = content.replace(match.group(1), '_________________', 1)
+        
+        # Ad Soyad alanlarını değiştir
+        ad_soyad_matches = list(re.finditer(ad_soyad_pattern, content))
+        for i, match in enumerate(ad_soyad_matches):
+            if i < len(signers):
+                signer_name, _ = signers[i]
+                content = content.replace(match.group(1), signer_name, 1)
+            else:
+                content = content.replace(match.group(1), '_________________', 1)
+        
+        # Ad/Şirket Adı alanlarını değiştir
+        ad_sirket_matches = list(re.finditer(ad_sirket_pattern, content))
+        for i, match in enumerate(ad_sirket_matches):
+            if i < len(signers):
+                signer_name, _ = signers[i]
+                content = content.replace(match.group(1), signer_name, 1)
+            else:
+                content = content.replace(match.group(1), '_________________', 1)
+        
+        # Tarih alanlarını değiştir
+        tarih_matches = list(re.finditer(tarih_pattern, content))
+        for i, match in enumerate(tarih_matches):
+            if i < len(signers):
+                _, signed_date = signers[i]
+                content = content.replace(match.group(1), signed_date, 1)
+            else:
+                content = content.replace(match.group(1), '_________________', 1)
+        
+        return content
+
 
 class ContractParty(models.Model):
     """Sözleşme tarafları"""
@@ -281,6 +394,26 @@ class ContractSignature(models.Model):
 
     def __str__(self):
         return f"{self.party.name} imzası - {self.contract.title}"
+    
+    def save(self, *args, **kwargs):
+        # İmza işlemi sırasında otomatik isim ekleme
+        if self.is_signed and not self.signed_at:
+            from django.utils import timezone
+            self.signed_at = timezone.now()
+        
+        # Eğer party yoksa ama user varsa, otomatik party oluştur
+        if not self.party and self.user:
+            party, created = ContractParty.objects.get_or_create(
+                contract=self.contract,
+                user=self.user,
+                defaults={
+                    'name': self.user.get_full_name() or self.user.username,
+                    'invitation_status': 'accepted'
+                }
+            )
+            self.party = party
+        
+        super().save(*args, **kwargs)
 
 
 class ContractApproval(models.Model):

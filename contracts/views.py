@@ -20,6 +20,7 @@ from .models import (
     Contract, ContractTemplate, ContractParty,
     ContractSignature, ContractApproval, ContractComment
 )
+from .forms import ContractTemplateForm
 
 
 def generate_contract_content(base_content, creator, second_party_id=None):
@@ -287,8 +288,14 @@ def contract_create(request):
         signatures__is_signed=True
     ).distinct().count()
 
+    # Kullanıcının kendi şablonlarını da ekle
+    user_templates = ContractTemplate.objects.filter(
+        Q(creator=request.user, is_system_template=False) |
+        Q(is_system_template=True, is_active=True)
+    ).order_by('-created_at')
+
     return render(request, 'contracts/contract_create.html', {
-        'templates': templates,
+        'templates': user_templates,
         'other_users': other_users,
         'invited_contracts_count': invited_contracts_count
     })
@@ -834,10 +841,10 @@ def invited_contracts(request):
 @login_required
 def declined_contracts(request):
     """Red edilen sözleşmeler"""
-    # Kullanıcının oluşturduğu ve red edilen sözleşmeler
+    # Kullanıcının oluşturduğu VEYA davet edildiği ve red ettiği sözleşmeler
     declined_contracts = Contract.objects.filter(
-        creator=request.user,
-        parties__invitation_status='declined'
+        Q(creator=request.user, parties__invitation_status='declined') |
+        Q(parties__user=request.user, parties__invitation_status='declined')
     ).distinct().order_by('-parties__declined_at')
 
     # Her sözleşme için red eden kişi bilgisini ekle
@@ -1501,3 +1508,193 @@ def add_contract_comment(request, pk):
         }, json_dumps_params={'ensure_ascii': False})
 
     return JsonResponse({'success': False, 'message': 'Geçersiz istek.'}, json_dumps_params={'ensure_ascii': False})
+
+
+# ==================== ŞABLON YÖNETİMİ ====================
+
+@login_required
+def my_templates(request):
+    """Kullanıcının kendi şablonları"""
+    templates = ContractTemplate.objects.filter(
+        creator=request.user,
+        is_system_template=False
+    ).order_by('-created_at')
+    
+    context = {
+        'templates': templates,
+        'page_title': 'Şablonlarım'
+    }
+    return render(request, 'contracts/my_templates.html', context)
+
+
+@login_required
+def template_create(request):
+    """Yeni şablon oluştur"""
+    if request.method == 'POST':
+        form = ContractTemplateForm(request.POST)
+        if form.is_valid():
+            template = form.save(commit=False)
+            template.creator = request.user
+            template.is_system_template = False
+            template.save()
+            messages.success(request, 'Şablon başarıyla oluşturuldu!')
+            return redirect('contracts:template_detail', pk=template.pk)
+    else:
+        form = ContractTemplateForm()
+    
+    context = {
+        'form': form,
+        'page_title': 'Yeni Şablon Oluştur'
+    }
+    return render(request, 'contracts/template_create.html', context)
+
+
+@login_required
+def template_detail(request, pk):
+    """Şablon detayı"""
+    template = get_object_or_404(ContractTemplate, pk=pk)
+    
+    # Erişim kontrolü
+    if not template.is_system_template and template.creator != request.user:
+        if template.visibility != 'public' and template.visibility != 'shared':
+            messages.error(request, 'Bu şablona erişim yetkiniz yok.')
+            return redirect('contracts:my_templates')
+    
+    context = {
+        'template': template,
+        'page_title': template.title
+    }
+    return render(request, 'contracts/template_detail.html', context)
+
+
+@login_required
+def template_edit(request, pk):
+    """Şablon düzenle"""
+    template = get_object_or_404(ContractTemplate, pk=pk)
+    
+    # Sadece oluşturan düzenleyebilir
+    if template.creator != request.user:
+        messages.error(request, 'Bu şablonu düzenleme yetkiniz yok.')
+        return redirect('contracts:my_templates')
+    
+    if request.method == 'POST':
+        form = ContractTemplateForm(request.POST, instance=template)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Şablon başarıyla güncellendi!')
+            return redirect('contracts:template_detail', pk=template.pk)
+    else:
+        form = ContractTemplateForm(instance=template)
+    
+    context = {
+        'form': form,
+        'template': template,
+        'page_title': f'{template.title} - Düzenle'
+    }
+    return render(request, 'contracts/template_edit.html', context)
+
+
+@login_required
+def template_delete(request, pk):
+    """Şablon sil"""
+    template = get_object_or_404(ContractTemplate, pk=pk)
+    
+    # Sadece oluşturan silebilir
+    if template.creator != request.user:
+        messages.error(request, 'Bu şablonu silme yetkiniz yok.')
+        return redirect('contracts:my_templates')
+    
+    if request.method == 'POST':
+        template.delete()
+        messages.success(request, 'Şablon başarıyla silindi!')
+        return redirect('contracts:my_templates')
+    
+    context = {
+        'template': template,
+        'page_title': f'{template.title} - Sil'
+    }
+    return render(request, 'contracts/template_delete.html', context)
+
+
+@login_required
+def template_share(request, pk):
+    """Şablon paylaşım ayarları"""
+    template = get_object_or_404(ContractTemplate, pk=pk)
+    
+    # Sadece oluşturan paylaşabilir
+    if template.creator != request.user:
+        messages.error(request, 'Bu şablonu paylaşma yetkiniz yok.')
+        return redirect('contracts:my_templates')
+    
+    if request.method == 'POST':
+        visibility = request.POST.get('visibility')
+        template.visibility = visibility
+        template.save()
+        
+        if visibility == 'shared':
+            messages.success(request, f'Şablon paylaşıldı! Paylaşım linki: {template.get_share_url(request)}')
+        else:
+            messages.success(request, 'Şablon paylaşım ayarları güncellendi!')
+        
+        return redirect('contracts:template_detail', pk=template.pk)
+    
+    context = {
+        'template': template,
+        'page_title': f'{template.title} - Paylaşım Ayarları'
+    }
+    return render(request, 'contracts/template_share.html', context)
+
+
+def template_share_view(request, share_code):
+    """Paylaşılan şablonu görüntüle"""
+    template = get_object_or_404(ContractTemplate, share_code=share_code, visibility='shared')
+    
+    context = {
+        'template': template,
+        'page_title': f'Paylaşılan Şablon: {template.title}'
+    }
+    return render(request, 'contracts/template_share_view.html', context)
+
+
+@login_required
+def template_use(request, pk):
+    """Şablonu kullanarak sözleşme oluştur"""
+    template = get_object_or_404(ContractTemplate, pk=pk)
+    
+    # Erişim kontrolü
+    if not template.is_system_template and template.creator != request.user:
+        if template.visibility != 'public' and template.visibility != 'shared':
+            messages.error(request, 'Bu şablonu kullanma yetkiniz yok.')
+            return redirect('contracts:contract_templates')
+    
+    # Şablonu kullanarak sözleşme oluştur
+    contract = Contract.objects.create(
+        title=f"{template.title} - {request.user.get_full_name() or request.user.username}",
+        content=template.content,
+        template=template,
+        creator=request.user,
+        visibility='private',
+        is_self_contract=False,
+        start_date=timezone.now().date(),
+        duration_months=1,
+        is_indefinite=False
+    )
+    
+    # Creator'ı otomatik olarak taraf olarak ekle
+    creator_party = ContractParty.objects.create(
+        contract=contract,
+        user=request.user,
+        role='party'
+    )
+    
+    # Creator için imza kaydı oluştur
+    creator_signature_code = generate_signature_code()
+    ContractSignature.objects.create(
+        contract=contract,
+        party=creator_party,
+        user=request.user,
+        signature_code=creator_signature_code
+    )
+    
+    messages.success(request, f'"{template.title}" şablonu kullanılarak sözleşme oluşturuldu!')
+    return redirect('contracts:contract_detail', pk=contract.pk)

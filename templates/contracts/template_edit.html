@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="fas fa-edit me-2"></i>{{ page_title }}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}</label>
+                                {{ form.title }}
+                                {% if form.title.errors %}
+                                    <div class="text-danger">{{ form.title.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.template_type.id_for_label }}" class="form-label">{{ form.template_type.label }}</label>
+                                {{ form.template_type }}
+                                {% if form.template_type.errors %}
+                                    <div class="text-danger">{{ form.template_type.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.content.id_for_label }}" class="form-label">{{ form.content.label }}</label>
+                            {{ form.content }}
+                            <div class="form-text">
+                                <strong>Placeholder'lar:</strong> [Ad Soyad], [Tarih], [İmza Alanı], [Ad/Şirket Adı] gibi placeholder'lar kullanabilirsiniz.
+                            </div>
+                            {% if form.content.errors %}
+                                <div class="text-danger">{{ form.content.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.visibility.id_for_label }}" class="form-label">{{ form.visibility.label }}</label>
+                            {{ form.visibility }}
+                            <div class="form-text">
+                                <strong>Gizli:</strong> Sadece siz görebilirsiniz<br>
+                                <strong>Halka Açık:</strong> Herkes görebilir ve kullanabilir<br>
+                                <strong>Paylaşımlı:</strong> Paylaşım linki ile erişilebilir
+                            </div>
+                            {% if form.visibility.errors %}
+                                <div class="text-danger">{{ form.visibility.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contracts:template_detail' template.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save me-2"></i>Değişiklikleri Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

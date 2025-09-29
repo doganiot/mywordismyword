@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="fas fa-share-alt me-2"></i>{{ page_title }}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <h5>Şablon Bilgileri</h5>
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>{{ template.title }}</h6>
+                                    <p class="text-muted">{{ template.description }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="visibility" class="form-label">Görünürlük Ayarları</label>
+                            <select name="visibility" id="visibility" class="form-select">
+                                <option value="private" {% if template.visibility == 'private' %}selected{% endif %}>
+                                    <i class="fas fa-lock me-1"></i>Gizli - Sadece siz görebilirsiniz
+                                </option>
+                                <option value="public" {% if template.visibility == 'public' %}selected{% endif %}>
+                                    <i class="fas fa-globe me-1"></i>Halka Açık - Herkes görebilir ve kullanabilir
+                                </option>
+                                <option value="shared" {% if template.visibility == 'shared' %}selected{% endif %}>
+                                    <i class="fas fa-share-alt me-1"></i>Paylaşımlı - Paylaşım linki ile erişilebilir
+                                </option>
+                            </select>
+                        </div>
+
+                        {% if template.visibility == 'shared' and template.share_code %}
+                            <div class="alert alert-success">
+                                <h6><i class="fas fa-link me-2"></i>Paylaşım Linki</h6>
+                                <p class="mb-2">Bu şablonu paylaşmak için aşağıdaki linki kullanabilirsiniz:</p>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="{{ request.scheme }}://{{ request.get_host }}/templates/share/{{ template.share_code }}/" readonly id="shareUrl">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
+                                        <i class="fas fa-copy"></i> Kopyala
+                                    </button>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Bu linke sahip olan herkes şablonu görüntüleyebilir ve kullanabilir.
+                                </small>
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'contracts:template_detail' template.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Geri Dön
+                            </a>
+                            <button type="submit" class="btn btn-info">
+                                <i class="fas fa-save me-2"></i>Ayarları Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const shareUrl = document.getElementById('shareUrl');
+    shareUrl.select();
+    shareUrl.setSelectionRange(0, 99999); // For mobile devices
+    navigator.clipboard.writeText(shareUrl.value).then(function() {
+        alert('Paylaşım linki kopyalandı!');
+    }, function(err) {
+        console.error('Kopyalama hatası: ', err);
+    });
+}
+</script>
+{% endblock %}

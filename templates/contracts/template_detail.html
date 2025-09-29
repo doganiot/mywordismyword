@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="fas fa-file-alt me-2"></i>{{ template.title }}</h2>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="badge bg-{% if template.template_type == 'company' %}primary{% elif template.template_type == 'relationship' %}danger{% else %}success{% endif %}">
+                            {{ template.get_template_type_display }}
+                        </span>
+                        <span class="badge bg-{% if template.visibility == 'private' %}secondary{% elif template.visibility == 'public' %}success{% else %}info{% endif %}">
+                            {% if template.visibility == 'private' %}
+                                <i class="fas fa-lock me-1"></i>Gizli
+                            {% elif template.visibility == 'public' %}
+                                <i class="fas fa-globe me-1"></i>Halka Açık
+                            {% else %}
+                                <i class="fas fa-share-alt me-1"></i>Paylaşımlı
+                            {% endif %}
+                        </span>
+                        {% if template.is_system_template %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-cog me-1"></i>Sistem Şablonu
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="btn-group">
+                    {% if not template.is_system_template and template.creator == user %}
+                        <a href="{% url 'contracts:template_edit' template.pk %}" class="btn btn-warning">
+                            <i class="fas fa-edit me-2"></i>Düzenle
+                        </a>
+                        <a href="{% url 'contracts:template_share' template.pk %}" class="btn btn-info">
+                            <i class="fas fa-share-alt me-2"></i>Paylaş
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'contracts:template_use' template.pk %}" class="btn btn-success">
+                        <i class="fas fa-play me-2"></i>Kullan
+                    </a>
+                </div>
+            </div>
+
+            <!-- Template Info -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Şablon Bilgileri</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">{{ template.description }}</p>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Oluşturan:</strong><br>
+                                    {% if template.creator %}
+                                        {{ template.creator.get_full_name|default:template.creator.username }}
+                                    {% else %}
+                                        Sistem
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Oluşturulma Tarihi:</strong><br>
+                                    {{ template.created_at|date:"d.m.Y H:i" }}
+                                </div>
+                            </div>
+                            {% if template.visibility == 'shared' and template.share_code %}
+                                <hr>
+                                <div class="alert alert-info">
+                                    <strong>Paylaşım Linki:</strong><br>
+                                    <code id="shareUrl">{{ request.scheme }}://{{ request.get_host }}/templates/share/{{ template.share_code }}/</code>
+                                    <button class="btn btn-sm btn-outline-primary ms-2" onclick="copyToClipboard()">
+                                        <i class="fas fa-copy"></i> Kopyala
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>İşlemler</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'contracts:template_use' template.pk %}" class="btn btn-success">
+                                    <i class="fas fa-play me-2"></i>Şablonu Kullan
+                                </a>
+                                {% if not template.is_system_template and template.creator == user %}
+                                    <a href="{% url 'contracts:template_edit' template.pk %}" class="btn btn-warning">
+                                        <i class="fas fa-edit me-2"></i>Düzenle
+                                    </a>
+                                    <a href="{% url 'contracts:template_share' template.pk %}" class="btn btn-info">
+                                        <i class="fas fa-share-alt me-2"></i>Paylaşım Ayarları
+                                    </a>
+                                    <a href="{% url 'contracts:template_delete' template.pk %}" class="btn btn-danger">
+                                        <i class="fas fa-trash me-2"></i>Sil
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Template Content -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-file-text me-2"></i>Şablon İçeriği</h5>
+                </div>
+                <div class="card-body">
+                    <div class="template-content border rounded p-4 bg-light">
+                        <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ template.content }}</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const shareUrl = document.getElementById('shareUrl');
+    navigator.clipboard.writeText(shareUrl.textContent).then(function() {
+        alert('Paylaşım linki kopyalandı!');
+    }, function(err) {
+        console.error('Kopyalama hatası: ', err);
+    });
+}
+</script>
+{% endblock %}

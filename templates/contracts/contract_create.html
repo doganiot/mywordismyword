@@ -38,9 +38,10 @@
                                 <i class="fas fa-magic me-1"></i>
                                 Hazır Şablon Kullan (İsteğe Bağlı)
                             </label>
-                            <div class="row g-3">
+                            <div class="row g-3" id="templateContainer">
                                 {% for template in templates %}
-                                    <div class="col-md-6 col-lg-4">
+                                    <div class="col-md-6 col-lg-4 template-item" 
+                                         data-template-type="{% if template.is_system_template %}system{% else %}user{% endif %}">
                                         <div class="template-card border rounded p-3 h-100 template-option"
                                              data-template-id="{{ template.id }}"
                                              data-template-content="{{ template.content }}">
@@ -52,12 +53,23 @@
                                                     {{ template.title }}
                                                 </label>
                                             </div>
-                                            <p class="text-muted small mb-2 mt-2">{{ template.description }}</p>
-                                            <span class="badge bg-primary">{{ template.get_template_type_display }}</span>
+                                            <p class="text-muted small mt-2 mb-0">
+                                                {{ template.description|truncatewords:15 }}
+                                            </p>
+                                            <div class="mt-2 d-flex justify-content-between align-items-center">
+                                                <span class="badge bg-{% if template.template_type == 'company' %}primary{% elif template.template_type == 'relationship' %}danger{% else %}success{% endif %}">
+                                                    {{ template.get_template_type_display }}
+                                                </span>
+                                                {% if not template.is_system_template %}
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-user me-1"></i>{{ template.creator.username }}
+                                                    </small>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     </div>
                                 {% endfor %}
-                                <div class="col-md-6 col-lg-4">
+                                <div class="col-md-6 col-lg-4 template-item" data-template-type="all">
                                     <div class="template-card border rounded p-3 h-100 template-option active"
                                          data-template-id=""
                                          data-template-content="">
@@ -609,6 +621,28 @@ function getFieldErrorMessage(field) {
     }
     return 'Geçersiz değer.';
 }
+
+// Şablon kategorisi filtreleme
+document.addEventListener('DOMContentLoaded', function() {
+    const categoryRadios = document.querySelectorAll('input[name="template_category"]');
+    const templateItems = document.querySelectorAll('.template-item');
+    
+    categoryRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            const selectedCategory = this.value;
+            
+            templateItems.forEach(item => {
+                const templateType = item.getAttribute('data-template-type');
+                
+                if (selectedCategory === 'all' || selectedCategory === templateType) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    });
+});
 </script>
 {% endblock %}
 {% endblock %}

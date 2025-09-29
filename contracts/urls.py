@@ -37,5 +37,15 @@ urlpatterns = [
 
     # Profil
     path('profile/', views.profile, name='profile'),
+    
+    # Şablon yönetimi
+    path('my-templates/', views.my_templates, name='my_templates'),
+    path('template/create/', views.template_create, name='template_create'),
+    path('template/<int:pk>/', views.template_detail, name='template_detail'),
+    path('template/<int:pk>/edit/', views.template_edit, name='template_edit'),
+    path('template/<int:pk>/delete/', views.template_delete, name='template_delete'),
+    path('template/<int:pk>/share/', views.template_share, name='template_share'),
+    path('template/<int:pk>/use/', views.template_use, name='template_use'),
+    path('templates/share/<str:share_code>/', views.template_share_view, name='template_share_view'),
 ]
 
