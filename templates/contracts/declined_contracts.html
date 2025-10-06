@@ -14,7 +14,7 @@
                     Red Edilen Sözleşmeler
                 </h1>
                 <p class="lead text-muted">
-                    Red edilen sözleşmelerinizi burada görüntüleyebilir, düzenleyebilir veya silebilirsiniz
+                    Oluşturduğunuz ve başka kullanıcılar tarafından red edilen sözleşmeleri burada görüntüleyebilir, yeniden oluşturabilir veya silebilirsiniz
                 </p>
                 
                 <!-- Sayaç -->
@@ -169,7 +169,12 @@
                         <i class="fas fa-times-circle fa-4x text-muted mb-4"></i>
                         <h3 class="text-muted">Red Edilen Sözleşme Yok</h3>
                         <p class="text-muted mb-4">
-                            Henüz red edilen sözleşmeniz bulunmuyor.
+                            Oluşturduğunuz sözleşmelerden henüz red edilen bir sözleşme bulunmuyor.<br>
+                            <small class="d-block mt-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Not: Davet edilen kullanıcılar red ettiğinde, sözleşme onlardan gizlenir ama sizden silinmez. 
+                                Siz bu sözleşmeleri düzenleyip tekrar gönderebilir veya silebilirsiniz.
+                            </small>
                         </p>
                         <a href="{% url 'contracts:contract_create' %}" class="btn btn-primary btn-lg">
                             <i class="fas fa-plus me-2"></i>

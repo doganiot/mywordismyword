@@ -324,7 +324,18 @@ def contract_templates(request):
 
 def contract_detail(request, pk):
     """Sözleşme detayı"""
-    contract = get_object_or_404(Contract, pk=pk)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk)
+    except Http404:
+        # Sözleşme bulunamadı - muhtemelen red edilip silinmiş
+        if request.user.is_authenticated:
+            messages.warning(request, 'Bu sözleşme artık mevcut değil. Sözleşme red edilip silinmiş olabilir.')
+            return redirect('contracts:my_contracts')
+        else:
+            messages.warning(request, 'Bu sözleşme artık mevcut değil.')
+            return redirect('contracts:home')
 
     # Görünürlük kontrolü
     if contract.visibility == 'private':
@@ -336,6 +347,13 @@ def contract_detail(request, pk):
             not contract.parties.filter(user=request.user).exists()):
             messages.error(request, 'Bu sözleşmeye erişim yetkiniz yok.')
             return redirect('contracts:home')
+        
+        # Red eden kullanıcılar (creator hariç) sözleşmeyi göremez
+        if contract.creator != request.user:
+            user_party_check = contract.parties.filter(user=request.user, invitation_status='declined').first()
+            if user_party_check:
+                messages.warning(request, 'Bu sözleşmeyi reddettiğiniz için artık görüntüleyemezsiniz.')
+                return redirect('contracts:invited_contracts')
 
     # Kullanıcının bu sözleşmedeki rolünü belirle
     user_party = None
@@ -375,7 +393,13 @@ def contract_detail(request, pk):
 @login_required
 def contract_edit(request, pk):
     """Sözleşme düzenleme"""
-    contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    except Http404:
+        messages.warning(request, 'Bu sözleşme artık mevcut değil. Sözleşme red edilip silinmiş olabilir.')
+        return redirect('contracts:my_contracts')
 
     # Sözleşme bütünlüğünü kontrol et
     try:
@@ -415,7 +439,13 @@ def contract_edit(request, pk):
 @login_required
 def declined_contract_recreate(request, pk):
     """Red edilen sözleşmeyi yeni sözleşme olarak yeniden oluştur"""
-    original_contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    from django.http import Http404
+    
+    try:
+        original_contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    except Http404:
+        messages.warning(request, 'Bu sözleşme artık mevcut değil.')
+        return redirect('contracts:declined_contracts')
     
     # Sadece red edilmiş sözleşmeler için
     if not original_contract.has_declined_parties():
@@ -531,7 +561,13 @@ def declined_contract_recreate(request, pk):
 @login_required
 def contract_delete(request, pk):
     """Sözleşme silme"""
-    contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk, creator=request.user)
+    except Http404:
+        messages.warning(request, 'Bu sözleşme artık mevcut değil. Sözleşme zaten silinmiş olabilir.')
+        return redirect('contracts:my_contracts')
 
     # Sözleşme silinebilir mi kontrolü
     if not contract.can_be_deleted:
@@ -590,27 +626,52 @@ def remove_contract_party(request, pk, party_id):
 @login_required
 def contract_decline(request, pk):
     """Sözleşmeyi reddetme"""
-    contract = get_object_or_404(Contract, pk=pk)
-    user_party = get_object_or_404(ContractParty, contract=contract, user=request.user)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk)
+        user_party = get_object_or_404(ContractParty, contract=contract, user=request.user)
+    except Http404:
+        messages.warning(request, 'Bu sözleşme artık mevcut değil. Sözleşme zaten silinmiş olabilir.')
+        return redirect('contracts:invited_contracts')
 
     if request.method == 'POST':
         # Red nedeni al
         decline_reason = request.POST.get('decline_reason', '').strip()
         
-        # Sözleşme reddetme işlemi
-        user_party.invitation_status = 'declined'
-        user_party.decline_reason = decline_reason
-        user_party.declined_at = timezone.now()
-        user_party.save()
-
-        # Sözleşme oluşturucusuna e-posta gönder
-        send_contract_declined_email(contract.creator.email, contract, request.user, decline_reason)
-
-        if decline_reason:
-            messages.success(request, f'Sözleşme daveti reddedildi. Red nedeni kaydedildi.')
+        # Kullanıcı sözleşmeyi oluşturan mı yoksa davet edilen mi?
+        is_creator = (contract.creator == request.user)
+        
+        if is_creator:
+            # Sözleşme oluşturan kendi sözleşmesini red ediyor - bu normalde olmamalı
+            # Ama olursa, sadece durumu güncelleyelim
+            user_party.invitation_status = 'declined'
+            user_party.decline_reason = decline_reason
+            user_party.declined_at = timezone.now()
+            user_party.save()
+            
+            messages.success(request, 'Sözleşme reddedildi.')
+            return redirect('contracts:my_contracts')
         else:
-            messages.success(request, 'Sözleşme daveti reddedildi.')
-        return redirect('contracts:invited_contracts')
+            # Davet edilen kullanıcı red ediyor - sözleşme SİLİNMEZ, sadece party durumu güncellenir
+            contract_title = contract.title
+            creator_email = contract.creator.email
+            
+            # Party durumunu güncelle
+            user_party.invitation_status = 'declined'
+            user_party.decline_reason = decline_reason
+            user_party.declined_at = timezone.now()
+            user_party.save()
+            
+            # Sözleşme oluşturucusuna e-posta gönder
+            send_contract_declined_email(creator_email, contract, request.user, decline_reason)
+            
+            if decline_reason:
+                messages.success(request, f'"{contract_title}" sözleşme daveti reddedildi. Red nedeni sözleşme oluşturucusuna iletildi.')
+            else:
+                messages.success(request, f'"{contract_title}" sözleşme daveti reddedildi.')
+            
+            return redirect('contracts:invited_contracts')
 
     invited_contracts_count = Contract.objects.filter(
         parties__user=request.user,
@@ -631,8 +692,14 @@ def contract_decline(request, pk):
 @login_required
 def contract_sign(request, pk):
     """Sözleşme imzalama"""
-    contract = get_object_or_404(Contract, pk=pk)
-    user_party = get_object_or_404(ContractParty, contract=contract, user=request.user)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk)
+        user_party = get_object_or_404(ContractParty, contract=contract, user=request.user)
+    except Http404:
+        messages.warning(request, 'Bu sözleşme artık mevcut değil. Sözleşme red edilip silinmiş olabilir.')
+        return redirect('contracts:invited_contracts')
 
     if request.method == 'POST':
         signature_code = request.POST.get('signature_code')
@@ -797,11 +864,11 @@ def signed_contracts(request):
 
 @login_required
 def invited_contracts(request):
-    """Kullanıcının davet edildiği sözleşmeler (henüz imzalamadığı)"""
-    # Kullanıcının davet edildiği ama henüz imzalamadığı sözleşmeleri al
+    """Kullanıcının davet edildiği sözleşmeler (henüz imzalamadığı ve reddetmediği)"""
+    # Kullanıcının davet edildiği ama henüz imzalamadığı ve reddetmediği sözleşmeleri al
     invited_parties = ContractParty.objects.filter(
         user=request.user,
-        invitation_status__in=['pending', 'accepted']
+        invitation_status__in=['pending', 'accepted']  # 'declined' durumunu dahil etme
     ).select_related('contract', 'contract__creator')
 
     invited_contracts = []
@@ -833,18 +900,21 @@ def invited_contracts(request):
         'total_invited': len(invited_contracts),
         'pending_count': len([c for c in invited_contracts if c.invitation_status == 'pending']),
         'accepted_count': len([c for c in invited_contracts if c.invitation_status == 'accepted']),
-        'declined_count': len([c for c in invited_contracts if c.invitation_status == 'declined']),
+        'declined_count': 0,  # Red edilen sözleşmeler artık gösterilmiyor
         'invited_contracts_count': invited_contracts_count
     })
 
 
 @login_required
 def declined_contracts(request):
-    """Red edilen sözleşmeler"""
-    # Kullanıcının oluşturduğu VEYA davet edildiği ve red ettiği sözleşmeler
+    """Red edilen sözleşmeler - Sadece kullanıcının oluşturduğu ve başkaları tarafından red edilen sözleşmeler"""
+    # Kullanıcının oluşturduğu ve başka kullanıcılar tarafından red edilen sözleşmeler
+    # Davet edilen kullanıcılar red ettiklerinde sözleşme otomatik silindiği için burada görünmezler
     declined_contracts = Contract.objects.filter(
-        Q(creator=request.user, parties__invitation_status='declined') |
-        Q(parties__user=request.user, parties__invitation_status='declined')
+        creator=request.user,
+        parties__invitation_status='declined'
+    ).exclude(
+        parties__user=request.user  # Kendi red ettiklerini gösterme
     ).distinct().order_by('-parties__declined_at')
 
     # Her sözleşme için red eden kişi bilgisini ekle
@@ -919,7 +989,16 @@ def profile(request):
 
 def contract_pdf(request, pk):
     """Sözleşmeyi PDF olarak indir"""
-    contract = get_object_or_404(Contract, pk=pk)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk)
+    except Http404:
+        if request.user.is_authenticated:
+            messages.warning(request, 'Bu sözleşme artık mevcut değil.')
+            return redirect('contracts:my_contracts')
+        else:
+            return HttpResponse('Sözleşme bulunamadı', status=404)
 
     # Görünürlük kontrolü
     if contract.visibility == 'private':
@@ -1109,7 +1188,16 @@ def contract_pdf(request, pk):
 
 def contract_image(request, pk):
     """Sözleşmeyi JPEG olarak indir"""
-    contract = get_object_or_404(Contract, pk=pk)
+    from django.http import Http404
+    
+    try:
+        contract = get_object_or_404(Contract, pk=pk)
+    except Http404:
+        if request.user.is_authenticated:
+            messages.warning(request, 'Bu sözleşme artık mevcut değil.')
+            return redirect('contracts:my_contracts')
+        else:
+            return HttpResponse('Sözleşme bulunamadı', status=404)
 
     # Görünürlük kontrolü
     if contract.visibility == 'private':
@@ -1276,18 +1364,15 @@ def send_contract_declined_email(email, contract, decliner, decline_reason=''):
 
     "{contract.title}" sözleşmesi için gönderdiğiniz davet, {decliner.get_full_name() or decliner.username} tarafından reddedildi.{reason_text}
 
-    Sözleşmeyi görüntülemek için:
-    http://localhost:8002{contract.get_absolute_url()}
-
     Sözleşme Detayları:
     - Başlangıç Tarihi: {contract.start_date.strftime('%d.%m.%Y')}
     - Süre: {contract.duration_display}
     - Davet Reddeden: {decliner.get_full_name() or decliner.username}
 
-    Red edilen sözleşmeleri yönetmek için:
-    http://localhost:8002/contracts/declined/
-
-    Başka bir kullanıcı davet etmek veya sözleşmeyi düzenlemek için platforma giriş yapabilirsiniz.
+    Ne yapabilirsiniz?
+    - Sözleşmeyi düzenleyip tekrar gönderebilirsiniz
+    - Red edilen sözleşmeleri görüntülemek için: http://localhost:8002/contracts/declined/
+    - Sözleşmeyi yeniden oluşturmak için: http://localhost:8002/contracts/{contract.pk}/recreate/
 
     sözümSöz Platformu
     """
@@ -1399,7 +1484,7 @@ def add_contract_party(request, pk):
             from django.conf import settings
 
             subject = f"SözümSöz - Sözleşmeye Davet Edildiniz: {contract.title}"
-            contract_url = f"http://localhost:8000/{contract.pk}/"
+            contract_url = f"http://localhost:8002/contracts/{contract.pk}/"
 
             message = f"""
             Merhaba {name},

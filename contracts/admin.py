@@ -6,10 +6,36 @@ from .models import (
 
 @admin.register(ContractTemplate)
 class ContractTemplateAdmin(admin.ModelAdmin):
-    list_display = ['title', 'template_type', 'is_active', 'created_at']
-    list_filter = ['template_type', 'is_active', 'created_at']
-    search_fields = ['title', 'description']
+    list_display = ['title', 'template_type', 'creator', 'is_system_template', 'visibility', 'is_active', 'created_at']
+    list_filter = ['template_type', 'is_system_template', 'visibility', 'is_active', 'created_at']
+    search_fields = ['title', 'description', 'creator__username']
     ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Temel Bilgiler', {
+            'fields': ('title', 'template_type', 'description', 'content')
+        }),
+        ('Sahiplik ve Görünürlük', {
+            'fields': ('creator', 'is_system_template', 'visibility')
+        }),
+        ('Paylaşım', {
+            'fields': ('share_code', 'shared_at'),
+            'classes': ('collapse',)
+        }),
+        ('Durum', {
+            'fields': ('is_active', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ['share_code', 'shared_at', 'created_at', 'updated_at']
+    
+    def save_model(self, request, obj, form, change):
+        # Admin'de oluşturulan şablonlar sistem şablonu olarak işaretlenir
+        if not change:  # Yeni oluşturuluyorsa
+            obj.is_system_template = True
+            obj.creator = None  # Sistem şablonu için creator yok
+        super().save_model(request, obj, form, change)
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
@@ -24,10 +50,24 @@ class ContractAdmin(admin.ModelAdmin):
 
 @admin.register(ContractParty)
 class ContractPartyAdmin(admin.ModelAdmin):
-    list_display = ['name', 'email', 'contract', 'role', 'invited_at', 'joined_at']
-    list_filter = ['role', 'invited_at', 'joined_at']
+    list_display = ['display_name', 'display_email', 'contract', 'role', 'invitation_status', 'invited_at', 'joined_at', 'declined_at']
+    list_filter = ['role', 'invitation_status', 'invited_at', 'joined_at', 'declined_at']
     search_fields = ['name', 'email', 'contract__title', 'user__username']
+    readonly_fields = ['invited_at', 'joined_at', 'declined_at']
     ordering = ['-invited_at']
+    
+    fieldsets = (
+        ('Taraf Bilgileri', {
+            'fields': ('contract', 'user', 'role')
+        }),
+        ('Manuel Giriş', {
+            'fields': ('name', 'email'),
+            'classes': ('collapse',)
+        }),
+        ('Davet Durumu', {
+            'fields': ('invitation_status', 'decline_reason', 'invited_at', 'joined_at', 'declined_at')
+        }),
+    )
 
 @admin.register(ContractSignature)
 class ContractSignatureAdmin(admin.ModelAdmin):

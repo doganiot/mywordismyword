@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-&1g-)w_+2$l#rj%0(x@s^vv3x0oh%b#)en)d@1uqnc1e6_#kzp'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-fallback-key-for-development')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 
 # Application definition
@@ -79,6 +80,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
+                'contracts.context_processors.contract_counts',  # Sözleşme sayaçları
             ],
         },
     },
@@ -151,11 +153,10 @@ AUTHENTICATION_BACKENDS = (
 
 SITE_ID = 1
 
+# Django Allauth - Updated Settings (v65+)
 ACCOUNT_EMAIL_VERIFICATION = 'none'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
-ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = False
+ACCOUNT_LOGIN_METHODS = {'email'}  # Replaces ACCOUNT_AUTHENTICATION_METHOD
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*']  # Replaces multiple settings
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_EMAIL_CONFIRMATION_HMAC = True
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 7
@@ -176,8 +177,8 @@ SOCIALACCOUNT_PROVIDERS = {
             'access_type': 'online',
         },
         'APP': {
-            'client_id': 'your-google-client-id',
-            'secret': 'your-google-secret',
+            'client_id': config('GOOGLE_CLIENT_ID', default=''),
+            'secret': config('GOOGLE_SECRET', default=''),
             'key': ''
         }
     },
@@ -202,27 +203,23 @@ SOCIALACCOUNT_PROVIDERS = {
         'VERIFIED_EMAIL': False,
         'VERSION': 'v13.0',
         'APP': {
-            'client_id': 'your-facebook-app-id',
-            'secret': 'your-facebook-secret',
+            'client_id': config('FACEBOOK_APP_ID', default=''),
+            'secret': config('FACEBOOK_SECRET', default=''),
             'key': ''
         }
     }
 }
 
 # Email settings
-# Development için console backend kullanıyoruz (e-postalar terminal'de görünür)
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@sozumsoz.com')
 
-# Default sender email
-DEFAULT_FROM_EMAIL = 'noreply@sozumsoz.com'
-
-# Production için aşağıdaki ayarları kullanabilirsiniz:
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'your-email@gmail.com'
-# EMAIL_HOST_PASSWORD = 'your-app-password'
+# SMTP Settings (for production)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 # Media files
 MEDIA_URL = '/media/'
