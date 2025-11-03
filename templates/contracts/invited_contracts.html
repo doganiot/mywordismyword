@@ -168,7 +168,7 @@
                                                     <li><a class="dropdown-item" href="{% url 'contracts:contract_pdf' pk=contract.pk %}">
                                                         <i class="fas fa-download me-2"></i>PDF İndir
                                                     </a></li>
-                                                    {% if contract.invitation_status == 'pending' %}
+                                                    {% if contract.invitation_status in 'pending,accepted' and not contract.user_signature.is_signed %}
                                                         <li><hr class="dropdown-divider"></li>
                                                         <li>
                                                             <form method="post" action="{% url 'contracts:contract_decline' pk=contract.pk %}"

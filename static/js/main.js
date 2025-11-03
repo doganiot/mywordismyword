@@ -338,34 +338,88 @@ function loadMoreContracts() {
  * Bildirim sistemi
  */
 function setupNotifications() {
-    // Real-time notifications için WebSocket bağlantısı simülasyonu
+    // Sayfa yüklendiğinde bir kez çalıştır
+    updateNotificationCounts();
+
+    // Her 30 saniyede bir bildirimleri güncelle
     setInterval(() => {
-        checkForNotifications();
-    }, 30000); // Her 30 saniyede bir kontrol et
+        updateNotificationCounts();
+    }, 30000);
 }
 
 /**
- * Bildirim kontrolü
+ * Bildirim sayılarını API'den al ve güncelle
  */
-function checkForNotifications() {
-    // Simüle edilmiş bildirim kontrolü
-    // Gerçek uygulamada WebSocket veya AJAX kullanılacak
-
-    const notificationCount = Math.floor(Math.random() * 3);
-    if (notificationCount > 0) {
-        showNotificationBadge(notificationCount);
+function updateNotificationCounts() {
+    // Kullanıcı giriş yapmamışsa çalışmasın
+    if (!document.body.hasAttribute('data-user-authenticated')) {
+        console.log('👤 Kullanıcı giriş yapmamış, bildirimler atlandı');
+        return;
     }
+
+    console.log('🔄 Bildirimler güncelleniyor...');
+
+    fetch('/api/notifications/', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+    })
+    .then(response => {
+        console.log('API yanıt durumu:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('📊 Bildirim verileri:', data);
+        
+        if (data.invited_contracts_count !== undefined) {
+            console.log(`✉️ Davet edildiğim: ${data.invited_contracts_count}`);
+            updateNotificationBadge('invited-contracts-count', data.invited_contracts_count);
+        }
+        if (data.declined_contracts_count !== undefined) {
+            console.log(`Red edilenler: ${data.declined_contracts_count}`);
+            updateNotificationBadge('declined-contracts-count', data.declined_contracts_count);
+            updateNotificationBadge('declined-contracts-count-warning', data.declined_contracts_count);
+        }
+        if (data.unread_notifications_count !== undefined) {
+            console.log(`Okunmamis bildirimler: ${data.unread_notifications_count}`);
+            updateNotificationBadge('unread-notifications-count', data.unread_notifications_count);
+        }
+        
+        console.log('Bildirimler güncellendi');
+    })
+    .catch(error => {
+        console.error('❌ Bildirim güncelleme hatası:', error);
+    });
 }
 
 /**
- * Bildirim rozeti göster
+ * Bildirim rozetini güncelle
  */
-function showNotificationBadge(count) {
-    const badge = document.querySelector('#notificationBadge');
-    if (badge) {
-        badge.textContent = count;
-        badge.style.display = 'inline';
+function updateNotificationBadge(elementId, count) {
+    const badge = document.querySelector(`[data-notification-id="${elementId}"]`);
+    
+    if (!badge) {
+        console.warn(`Badge bulunamadı: ${elementId}`);
+        return;
+    }
+    
+    // Sayıyı güncelle
+    badge.textContent = count;
+    
+    if (count > 0) {
+        badge.style.display = 'inline-block';
         badge.classList.add('animate-pulse');
+        
+        // Sayfa yüklendikten sonra animasyonu kaldır
+        setTimeout(() => {
+            badge.classList.remove('animate-pulse');
+        }, 2000);
+    } else {
+        badge.style.display = 'none';
+        badge.classList.remove('animate-pulse');
     }
 }
 
@@ -580,6 +634,109 @@ const storage = {
     }
 };
 
+/**
+ * Bildirim dropdown fonksiyonları
+ */
+function loadNotificationDropdown() {
+    const dropdownContent = document.getElementById('notificationDropdownContent');
+    if (!dropdownContent) return;
+    
+    fetch('/api/notifications/recent/', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.notifications && data.notifications.length > 0) {
+            let html = '';
+            data.notifications.forEach(notification => {
+                html += `
+                    <li>
+                        <a class="dropdown-item notification-item ${!notification.is_read ? 'notification-unread' : ''}" 
+                           href="${notification.action_url || '#'}"
+                           onclick="markNotificationAsRead('${notification.id}')">
+                            <div class="d-flex">
+                                <i class="${notification.icon_class} text-${notification.color_class} me-2 mt-1"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold small">${notification.title}</div>
+                                    <div class="text-muted small">${notification.message.substring(0, 60)}...</div>
+                                    <small class="text-muted">${notification.time_since_created}</small>
+                                </div>
+                                ${!notification.is_read ? '<span class="badge bg-primary">Yeni</span>' : ''}
+                            </div>
+                        </a>
+                    </li>
+                `;
+            });
+            dropdownContent.innerHTML = html;
+        } else {
+            dropdownContent.innerHTML = `
+                <li class="text-center py-3">
+                    <i class="fas fa-bell-slash text-muted"></i>
+                    <small class="text-muted d-block">Henüz bildirim yok</small>
+                </li>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Bildirim dropdown yükleme hatası:', error);
+        dropdownContent.innerHTML = `
+            <li class="text-center py-3">
+                <small class="text-danger">Bildirimler yüklenemedi</small>
+            </li>
+        `;
+    });
+}
+
+function markNotificationAsRead(notificationId) {
+    fetch(`/api/notification/${notificationId}/read/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+    })
+    .then(() => {
+        updateNotificationCounts();
+    })
+    .catch(error => {
+        console.error('Bildirim okundu işaretleme hatası:', error);
+    });
+}
+
+function markAllNotificationsRead() {
+    fetch('/api/notifications/mark-all-read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+    })
+    .then(() => {
+        updateNotificationCounts();
+        loadNotificationDropdown();
+    })
+    .catch(error => {
+        console.error('Tüm bildirimleri okundu işaretleme hatası:', error);
+    });
+}
+
+// Notification dropdown açıldığında bildirimleri yükle
+document.addEventListener('DOMContentLoaded', function() {
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    if (notificationDropdown) {
+        notificationDropdown.addEventListener('shown.bs.dropdown', function() {
+            loadNotificationDropdown();
+        });
+    }
+});
+
 // Global değişkenler
 window.SozumSozum = {
     apiCall,
@@ -588,6 +745,11 @@ window.SozumSozum = {
     storage,
     showSuccessMessage,
     showErrorMessage,
-    copyToClipboard
+    copyToClipboard,
+    updateNotificationCounts,
+    updateNotificationBadge,
+    loadNotificationDropdown,
+    markNotificationAsRead,
+    markAllNotificationsRead
 };
 

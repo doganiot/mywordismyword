@@ -81,7 +81,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
-                'contracts.context_processors.declined_contracts_count',
+                'contracts.context_processors.contract_counts',
             ],
         },
     },

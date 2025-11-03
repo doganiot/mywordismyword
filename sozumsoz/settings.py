@@ -11,7 +11,29 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from decouple import config, Csv
+try:
+    from decouple import config, Csv
+except ImportError:
+    # Fallback if decouple is not installed
+    import os
+    
+    class ConfigHelper:
+        def __call__(self, key, default=None, cast=None):
+            value = os.environ.get(key, default)
+            if cast and value is not None:
+                if callable(cast):
+                    return cast(value)
+                return cast
+            return value
+    
+    class CsvHelper:
+        def __call__(self, value):
+            if isinstance(value, str):
+                return [v.strip() for v in value.split(',')]
+            return value
+    
+    config = ConfigHelper()
+    Csv = CsvHelper
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -155,8 +177,9 @@ SITE_ID = 1
 
 # Django Allauth - Updated Settings (v65+)
 ACCOUNT_EMAIL_VERIFICATION = 'none'
-ACCOUNT_LOGIN_METHODS = {'email'}  # Replaces ACCOUNT_AUTHENTICATION_METHOD
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*']  # Replaces multiple settings
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_EMAIL_CONFIRMATION_HMAC = True
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 7
@@ -213,6 +236,9 @@ SOCIALACCOUNT_PROVIDERS = {
 # Email settings
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@sozumsoz.com')
+
+# Development için email göndermeden bildirim simülasyonu
+SEND_ACTUAL_EMAILS = config('SEND_ACTUAL_EMAILS', default=False, cast=bool)
 
 # SMTP Settings (for production)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')

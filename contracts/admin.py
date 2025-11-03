@@ -1,41 +1,34 @@
 from django.contrib import admin
 from .models import (
     ContractTemplate, Contract, ContractParty,
-    ContractSignature, ContractApproval, ContractComment, UserProfile
+    ContractSignature, ContractApproval, ContractComment, UserProfile, Notification
 )
 
 @admin.register(ContractTemplate)
 class ContractTemplateAdmin(admin.ModelAdmin):
-    list_display = ['title', 'template_type', 'creator', 'is_system_template', 'visibility', 'is_active', 'created_at']
-    list_filter = ['template_type', 'is_system_template', 'visibility', 'is_active', 'created_at']
+    list_display = ['title', 'category', 'creator', 'is_public', 'is_active', 'usage_count', 'created_at']
+    list_filter = ['category', 'is_public', 'is_active', 'created_at']
     search_fields = ['title', 'description', 'creator__username']
     ordering = ['-created_at']
     
     fieldsets = (
         ('Temel Bilgiler', {
-            'fields': ('title', 'template_type', 'description', 'content')
+            'fields': ('title', 'category', 'description', 'content')
         }),
         ('Sahiplik ve Görünürlük', {
-            'fields': ('creator', 'is_system_template', 'visibility')
+            'fields': ('creator', 'is_public', 'is_active')
         }),
         ('Paylaşım', {
-            'fields': ('share_code', 'shared_at'),
+            'fields': ('is_shareable', 'share_code', 'share_expires_at'),
             'classes': ('collapse',)
         }),
-        ('Durum', {
-            'fields': ('is_active', 'created_at', 'updated_at'),
+        ('İstatistikler', {
+            'fields': ('usage_count', 'created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
     
-    readonly_fields = ['share_code', 'shared_at', 'created_at', 'updated_at']
-    
-    def save_model(self, request, obj, form, change):
-        # Admin'de oluşturulan şablonlar sistem şablonu olarak işaretlenir
-        if not change:  # Yeni oluşturuluyorsa
-            obj.is_system_template = True
-            obj.creator = None  # Sistem şablonu için creator yok
-        super().save_model(request, obj, form, change)
+    readonly_fields = ['share_code', 'share_expires_at', 'usage_count', 'created_at', 'updated_at']
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
@@ -79,10 +72,10 @@ class ContractSignatureAdmin(admin.ModelAdmin):
 
 @admin.register(ContractApproval)
 class ContractApprovalAdmin(admin.ModelAdmin):
-    list_display = ['user', 'contract', 'is_approved', 'approved_at', 'ip_address']
+    list_display = ['user', 'contract', 'is_approved', 'approved_at']
     list_filter = ['is_approved', 'approved_at']
     search_fields = ['user__username', 'user__email', 'contract__title']
-    readonly_fields = ['approved_at', 'ip_address']
+    readonly_fields = ['approved_at']
     ordering = ['-approved_at']
 
 @admin.register(ContractComment)
@@ -105,10 +98,43 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('user',)
         }),
         ('Profil Bilgileri', {
-            'fields': ('birth_date', 'gender')
+            'fields': ('birth_date', 'gender', 'phone', 'address')
+        }),
+        ('Bildirim Tercihleri', {
+            'fields': ('email_notifications', 'push_notifications'),
+            'classes': ('collapse',)
         }),
         ('İstatistikler', {
-            'fields': ('age', 'created_at', 'updated_at'),
+            'fields': ('total_contracts_created', 'total_contracts_signed', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['title', 'recipient', 'sender', 'notification_type', 'priority', 'is_read', 'is_sent', 'created_at']
+    list_filter = ['notification_type', 'priority', 'is_read', 'is_sent', 'created_at']
+    search_fields = ['title', 'message', 'recipient__username', 'sender__username']
+    readonly_fields = ['created_at', 'read_at', 'sent_at']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Bildirim Bilgileri', {
+            'fields': ('notification_type', 'priority', 'title', 'message')
+        }),
+        ('Kullanıcılar', {
+            'fields': ('recipient', 'sender')
+        }),
+        ('İlgili Objeler', {
+            'fields': ('contract',),
+            'classes': ('collapse',)
+        }),
+        ('Durum', {
+            'fields': ('is_read', 'is_sent', 'created_at', 'read_at', 'sent_at')
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
             'classes': ('collapse',)
         }),
     )

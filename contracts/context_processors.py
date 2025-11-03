@@ -11,12 +11,16 @@ def contract_counts(request):
         }
     
     # Red edilen sözleşme sayısı (sadece kullanıcının oluşturduğu ve başkaları tarafından red edilen)
-    declined_count = Contract.objects.filter(
-        creator=request.user,
-        parties__invitation_status='declined'
-    ).exclude(
-        parties__user=request.user  # Kendi red ettiklerini sayma
-    ).distinct().count()
+    # Kullanıcının oluşturduğu sözleşmelerden, başka birinin red ettiği sözleşmeleri bul
+    declined_count = 0
+    user_contracts = Contract.objects.filter(creator=request.user)
+    for contract in user_contracts:
+        # Bu sözleşmede başka birinin red ettiği party var mı?
+        other_declined = contract.parties.filter(
+            invitation_status='declined'
+        ).exclude(user=request.user).exists()
+        if other_declined:
+            declined_count += 1
     
     # Davet edilen sözleşme sayısı (henüz imzalamadığı ve reddetmediği)
     invited_count = Contract.objects.filter(

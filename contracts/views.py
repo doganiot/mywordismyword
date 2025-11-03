@@ -18,9 +18,149 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
 from .models import (
     Contract, ContractTemplate, ContractParty,
-    ContractSignature, ContractApproval, ContractComment
+    ContractSignature, ContractApproval, ContractComment, Notification
 )
 from .forms import ContractTemplateForm
+
+
+@login_required
+def get_notification_counts(request):
+    """Bildirim sayılarını JSON olarak döndür"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    # Context processor'daki aynı mantığı kullan
+    from .context_processors import contract_counts
+    counts = contract_counts(request)
+    
+    # Okunmamış bildirim sayısını ekle
+    unread_notifications = Notification.objects.filter(
+        recipient=request.user,
+        is_read=False
+    ).count()
+    
+    counts['unread_notifications_count'] = unread_notifications
+
+    return JsonResponse(counts)
+
+
+@login_required
+def get_recent_notifications(request):
+    """Son bildirimleri JSON olarak döndür (dropdown için)"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    notifications = Notification.objects.filter(
+        recipient=request.user
+    ).order_by('-created_at')[:5]  # Son 5 bildirim
+    
+    notifications_data = []
+    for notification in notifications:
+        notifications_data.append({
+            'id': str(notification.id),
+            'title': notification.title,
+            'message': notification.message,
+            'is_read': notification.is_read,
+            'time_since_created': notification.time_since_created,
+            'icon_class': notification.icon_class,
+            'color_class': notification.color_class,
+            'action_url': notification.get_action_url(),
+        })
+    
+    return JsonResponse({
+        'notifications': notifications_data,
+        'unread_count': Notification.objects.filter(recipient=request.user, is_read=False).count()
+    })
+
+
+@login_required
+def notifications_list(request):
+    """Kullanıcının bildirimlerini listele"""
+    notifications = Notification.objects.filter(
+        recipient=request.user
+    ).order_by('-created_at')
+    
+    # Sayfalama
+    from django.core.paginator import Paginator
+    paginator = Paginator(notifications, 20)  # 20 bildirim per sayfa
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Okunmamış bildirim sayısı
+    unread_count = notifications.filter(is_read=False).count()
+    
+    return render(request, 'contracts/notifications_list.html', {
+        'notifications': page_obj,
+        'unread_count': unread_count,
+        'total_count': notifications.count(),
+    })
+
+
+@login_required
+def notification_mark_read(request, notification_id):
+    """Bildirimi okundu olarak işaretle"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        notification = Notification.objects.get(
+            id=notification_id,
+            recipient=request.user
+        )
+        notification.mark_as_read()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Bildirim okundu olarak işaretlendi'
+        })
+    except Notification.DoesNotExist:
+        return JsonResponse({
+            'error': 'Bildirim bulunamadı'
+        }, status=404)
+
+
+@login_required
+def notification_mark_all_read(request):
+    """Tüm bildirimleri okundu olarak işaretle"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    updated_count = Notification.objects.filter(
+        recipient=request.user,
+        is_read=False
+    ).update(
+        is_read=True,
+        read_at=timezone.now()
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'message': f'{updated_count} bildirim okundu olarak işaretlendi',
+        'updated_count': updated_count
+    })
+
+
+@login_required
+def notification_delete(request, notification_id):
+    """Bildirimi sil"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        notification = Notification.objects.get(
+            id=notification_id,
+            recipient=request.user
+        )
+        notification.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Bildirim silindi'
+        })
+    except Notification.DoesNotExist:
+        return JsonResponse({
+            'error': 'Bildirim bulunamadı'
+        }, status=404)
 
 
 def generate_contract_content(base_content, creator, second_party_id=None):
@@ -263,6 +403,28 @@ def contract_create(request):
                 # Sözleşme daveti ve imza e-postası gönder
                 send_contract_invitation_email(second_party.email, contract, request.user)
                 send_signature_email(second_party.email, contract, signature_code)
+                
+                # Bildirim oluştur
+                Notification.objects.create(
+                    recipient=second_party,
+                    sender=request.user,
+                    notification_type='contract_invitation',
+                    title=f'Sözleşme Daveti: {contract.title}',
+                    message=f'{request.user.get_full_name() or request.user.username} sizi "{contract.title}" sözleşmesine davet etti.',
+                    contract=contract,
+                    priority='normal',
+                    metadata={
+                        'contract_id': str(contract.id),
+                        'inviter': request.user.username,
+                    }
+                )
+                
+                # Development modunda davet durumunu otomatik kabul et
+                from django.conf import settings
+                if not getattr(settings, 'SEND_ACTUAL_EMAILS', False):
+                    party.invitation_status = 'accepted'
+                    party.save()
+                    print(f"[AUTO] Development modunda {second_party.email} icin davet otomatik kabul edildi")
             except User.DoesNotExist:
                 pass
 
@@ -290,8 +452,9 @@ def contract_create(request):
 
     # Kullanıcının kendi şablonlarını da ekle
     user_templates = ContractTemplate.objects.filter(
-        Q(creator=request.user, is_system_template=False) |
-        Q(is_system_template=True, is_active=True)
+        Q(creator=request.user) |
+        Q(creator__isnull=True, is_active=True) |
+        Q(is_public=True, is_active=True)
     ).order_by('-created_at')
 
     return render(request, 'contracts/contract_create.html', {
@@ -910,26 +1073,33 @@ def declined_contracts(request):
     """Red edilen sözleşmeler - Sadece kullanıcının oluşturduğu ve başkaları tarafından red edilen sözleşmeler"""
     # Kullanıcının oluşturduğu ve başka kullanıcılar tarafından red edilen sözleşmeler
     # Davet edilen kullanıcılar red ettiklerinde sözleşme otomatik silindiği için burada görünmezler
-    declined_contracts = Contract.objects.filter(
-        creator=request.user,
-        parties__invitation_status='declined'
-    ).exclude(
-        parties__user=request.user  # Kendi red ettiklerini gösterme
-    ).distinct().order_by('-parties__declined_at')
+    # Kullanıcının oluşturduğu sözleşmelerden başka birinin red ettiği sözleşmeleri bul
+    user_contracts = Contract.objects.filter(creator=request.user).prefetch_related('parties')
+    declined_contracts = []
+    
+    for contract in user_contracts:
+        # Bu sözleşmede başka birinin red ettiği party var mı?
+        other_declined_parties = contract.parties.filter(
+            invitation_status='declined'
+        ).exclude(user=request.user)
+        
+        if other_declined_parties.exists():
+            # Red eden tarafları da contract'a ekle
+            contract.declined_parties = other_declined_parties
+            declined_contracts.append(contract)
 
-    # Her sözleşme için red eden kişi bilgisini ekle
-    contracts_with_decliners = []
+    # Declined_at tarihine göre sırala
+    declined_contracts.sort(key=lambda x: x.declined_parties.first().declined_at if x.declined_parties.first().declined_at else timezone.now(), reverse=True)
+
+    # İstatistikleri hesapla
+    contracts_with_decliners = declined_contracts
     total_declined_parties = 0
     parties_with_reason = 0
     parties_without_reason = 0
     
     for contract in declined_contracts:
-        declined_parties = contract.parties.filter(invitation_status='declined')
-        contract.declined_parties = declined_parties
-        contracts_with_decliners.append(contract)
-        
         # İstatistikleri hesapla
-        for party in declined_parties:
+        for party in contract.declined_parties:
             total_declined_parties += 1
             if party.decline_reason:
                 parties_with_reason += 1
@@ -1314,9 +1484,23 @@ def send_signature_email(email, contract, code):
     """
     try:
         from django.core.mail import send_mail
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
-    except:
-        pass  # E-posta hatası olsa bile devam et
+        from django.conf import settings
+        
+        print(f"[EMAIL] Imza kodu gonderiliyor:")
+        print(f"   Alici: {email}")
+        print(f"   Sozlesme: {contract.title}")
+        print(f"   Imza Kodu: {code}")
+        
+        if getattr(settings, 'SEND_ACTUAL_EMAILS', False):
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+            print(f"   [OK] Email gonderildi!")
+        else:
+            print(f"   [DEV] Development modunda - email simule edildi")
+            
+    except Exception as e:
+        print(f"   [ERROR] Email gonderme hatasi: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def send_contract_invitation_email(email, contract, inviter):
@@ -1342,9 +1526,24 @@ def send_contract_invitation_email(email, contract, inviter):
     """
     try:
         from django.core.mail import send_mail
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
-    except:
-        pass  # E-posta hatası olsa bile devam et
+        from django.conf import settings
+        
+        print(f"[EMAIL] Sozlesme daveti gonderiliyor:")
+        print(f"   Alici: {email}")
+        print(f"   Sozlesme: {contract.title}")
+        print(f"   Davet Eden: {inviter.get_full_name() or inviter.username}")
+        
+        if getattr(settings, 'SEND_ACTUAL_EMAILS', False):
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+            print(f"   [OK] Email gonderildi!")
+        else:
+            print(f"   [DEV] Development modunda - email simule edildi")
+            print(f"   [INFO] Icerik: {message[:100]}...")
+            
+    except Exception as e:
+        print(f"   [ERROR] Email gonderme hatasi: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def send_contract_declined_email(email, contract, decliner, decline_reason=''):
@@ -1378,9 +1577,24 @@ def send_contract_declined_email(email, contract, decliner, decline_reason=''):
     """
     try:
         from django.core.mail import send_mail
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
-    except:
-        pass  # E-posta hatası olsa bile devam et
+        from django.conf import settings
+        
+        print(f"[EMAIL] Sozlesme reddetme bildirimi gonderiliyor:")
+        print(f"   Alici: {email}")
+        print(f"   Sozlesme: {contract.title}")
+        print(f"   Reddeden: {decliner.get_full_name() or decliner.username}")
+        print(f"   Red Nedeni: {decline_reason[:50]}..." if decline_reason else "   Red Nedeni: Belirtilmedi")
+        
+        if getattr(settings, 'SEND_ACTUAL_EMAILS', False):
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
+            print(f"   [OK] Email gonderildi!")
+        else:
+            print(f"   [DEV] Development modunda - email simule edildi")
+            
+    except Exception as e:
+        print(f"   [ERROR] Email gonderme hatasi: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # API Views
@@ -1468,6 +1682,29 @@ def add_contract_party(request, pk):
 
             # İmza e-postası gönder
             send_signature_email(user.email, contract, signature_code)
+            
+            # Bildirim oluştur
+            Notification.objects.create(
+                recipient=user,
+                sender=request.user,
+                notification_type='contract_invitation',
+                title=f'Sözleşmeye Eklendi: {contract.title}',
+                message=f'{request.user.get_full_name() or request.user.username} sizi "{contract.title}" sözleşmesine {role} olarak ekledi.',
+                contract=contract,
+                priority='normal',
+                metadata={
+                    'contract_id': str(contract.id),
+                    'added_by': request.user.username,
+                    'role': role,
+                }
+            )
+            
+            # Development modunda davet durumunu otomatik kabul et
+            from django.conf import settings
+            if not getattr(settings, 'SEND_ACTUAL_EMAILS', False):
+                party.invitation_status = 'accepted'
+                party.save()
+                print(f"[AUTO] Development modunda {user.email} icin davet otomatik kabul edildi")
         else:
             # Manuel giriş ise (sistem kullanıcısı değil)
             party = ContractParty.objects.create(
@@ -1601,8 +1838,7 @@ def add_contract_comment(request, pk):
 def my_templates(request):
     """Kullanıcının kendi şablonları"""
     templates = ContractTemplate.objects.filter(
-        creator=request.user,
-        is_system_template=False
+        creator=request.user
     ).order_by('-created_at')
     
     context = {
@@ -1620,7 +1856,6 @@ def template_create(request):
         if form.is_valid():
             template = form.save(commit=False)
             template.creator = request.user
-            template.is_system_template = False
             template.save()
             messages.success(request, 'Şablon başarıyla oluşturuldu!')
             return redirect('contracts:template_detail', pk=template.pk)
@@ -1640,8 +1875,9 @@ def template_detail(request, pk):
     template = get_object_or_404(ContractTemplate, pk=pk)
     
     # Erişim kontrolü
-    if not template.is_system_template and template.creator != request.user:
-        if template.visibility != 'public' and template.visibility != 'shared':
+    # Sistem şablonu değilse ve kullanıcı oluşturucu değilse
+    if template.creator and template.creator != request.user:
+        if not template.is_public and not template.is_shareable:
             messages.error(request, 'Bu şablona erişim yetkiniz yok.')
             return redirect('contracts:my_templates')
     
@@ -1713,13 +1949,19 @@ def template_share(request, pk):
     
     if request.method == 'POST':
         visibility = request.POST.get('visibility')
-        template.visibility = visibility
-        template.save()
-        
         if visibility == 'shared':
+            template.is_shareable = True
+            if not template.share_code:
+                template.generate_share_code()
             messages.success(request, f'Şablon paylaşıldı! Paylaşım linki: {template.get_share_url(request)}')
+        elif visibility == 'public':
+            template.is_public = True
+            messages.success(request, 'Şablon herkese açık olarak ayarlandı!')
         else:
+            template.is_shareable = False
+            template.is_public = False
             messages.success(request, 'Şablon paylaşım ayarları güncellendi!')
+        template.save()
         
         return redirect('contracts:template_detail', pk=template.pk)
     
@@ -1732,7 +1974,17 @@ def template_share(request, pk):
 
 def template_share_view(request, share_code):
     """Paylaşılan şablonu görüntüle"""
-    template = get_object_or_404(ContractTemplate, share_code=share_code, visibility='shared')
+    from django.utils import timezone
+    template = get_object_or_404(
+        ContractTemplate, 
+        share_code=share_code, 
+        is_shareable=True
+    )
+    
+    # Paylaşım kodunun geçerliliğini kontrol et
+    if template.share_expires_at and template.share_expires_at < timezone.now():
+        messages.error(request, 'Bu paylaşım linki süresi dolmuş.')
+        return redirect('contracts:contract_templates')
     
     context = {
         'template': template,
@@ -1747,8 +1999,9 @@ def template_use(request, pk):
     template = get_object_or_404(ContractTemplate, pk=pk)
     
     # Erişim kontrolü
-    if not template.is_system_template and template.creator != request.user:
-        if template.visibility != 'public' and template.visibility != 'shared':
+    # Sistem şablonu değilse ve kullanıcı oluşturucu değilse
+    if template.creator and template.creator != request.user:
+        if not template.is_public and not template.is_shareable:
             messages.error(request, 'Bu şablonu kullanma yetkiniz yok.')
             return redirect('contracts:contract_templates')
     

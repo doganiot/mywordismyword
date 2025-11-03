@@ -308,7 +308,7 @@
                     {% endif %}
 
                     <!-- Red Etme Butonu -->
-                    {% if user_party and user_party.invitation_status == 'pending' %}
+                    {% if user_party and user_party.invitation_status in 'pending,accepted' and not user_party.signatures.first.is_signed %}
                         <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#declineModal">
                             <i class="fas fa-times me-1"></i> Daveti Reddet
                         </button>

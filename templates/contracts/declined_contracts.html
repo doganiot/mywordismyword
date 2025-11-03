@@ -250,23 +250,6 @@
 </style>
 
 {% block extra_js %}
-<script>
-function deleteContract(contractId) {
-    if (confirm('Bu sözleşmeyi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
-        // Silme işlemi için form oluştur
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/contracts/${contractId}/delete/`;
-
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-        if (csrfToken) {
-            form.appendChild(csrfToken.cloneNode(true));
-        }
-
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-</script>
+<script src="{% static 'js/declined-contracts.js' %}"></script>
 {% endblock %}
 {% endblock %}

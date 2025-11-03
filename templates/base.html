@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}sözümSöz - Eğlenceli Sözleşmeler{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABILAAASCwAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==">
 
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -15,7 +18,7 @@
 
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+    <body {% if user.is_authenticated %}data-user-authenticated="true"{% endif %}>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
@@ -53,20 +56,16 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'contracts:invited_contracts' %}">
                                 <i class="fas fa-envelope-open"></i> Davet Edildiğim
-                                {% if invited_contracts_count > 0 %}
-                                    <span class="badge bg-danger">{{ invited_contracts_count }}</span>
-                                {% endif %}
+                                <span class="badge bg-danger" data-notification-id="invited-contracts-count" style="{% if invited_contracts_count == 0 %}display: none;{% endif %}">{{ invited_contracts_count|default:"0" }}</span>
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link position-relative" href="{% url 'contracts:declined_contracts' %}">
                                 <i class="fas fa-times-circle"></i> Red Edilenler
-                                {% if declined_contracts_count > 0 %}
-                                    <span class="badge bg-danger ms-1">{{ declined_contracts_count }}</span>
-                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark" style="font-size: 0.6rem;">
-                                        {{ declined_contracts_count }}
-                                    </span>
-                                {% endif %}
+                                <span class="badge bg-danger ms-1" data-notification-id="declined-contracts-count" style="{% if declined_contracts_count == 0 %}display: none;{% endif %}">{{ declined_contracts_count|default:"0" }}</span>
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark" style="font-size: 0.6rem; {% if declined_contracts_count == 0 %}display: none;{% endif %}" data-notification-id="declined-contracts-count-warning">
+                                    {{ declined_contracts_count|default:"0" }}
+                                </span>
                             </a>
                         </li>
                     {% endif %}
@@ -74,6 +73,42 @@
 
                 <ul class="navbar-nav">
                     {% if user.is_authenticated %}
+                        <!-- Bildirimler Dropdown -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle position-relative" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-bell"></i>
+                                <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill" 
+                                      data-notification-id="unread-notifications-count" style="display: none;">0</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end notification-dropdown" style="width: 350px; max-height: 400px; overflow-y: auto;">
+                                <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                    <span>Bildirimler</span>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="markAllNotificationsRead()" style="font-size: 0.7rem;">
+                                        Tümünü Okundu İşaretle
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                
+                                <div id="notificationDropdownContent">
+                                    <li class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm" role="status">
+                                            <span class="visually-hidden">Yükleniyor...</span>
+                                        </div>
+                                        <small class="text-muted d-block mt-2">Bildirimler yükleniyor...</small>
+                                    </li>
+                                </div>
+                                
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-center" href="{% url 'contracts:notifications_list' %}">
+                                        <i class="fas fa-list me-1"></i>
+                                        Tüm Bildirimleri Gör
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        
+                        <!-- Kullanıcı Dropdown -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="fas fa-user"></i> {{ user.get_full_name|default:user.username }}

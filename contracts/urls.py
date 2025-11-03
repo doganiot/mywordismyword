@@ -34,6 +34,14 @@ urlpatterns = [
     path('api/contract/<uuid:pk>/add-party/', views.add_contract_party, name='add_contract_party'),
     path('api/contract/<uuid:pk>/comment/', views.add_contract_comment, name='add_contract_comment'),
     path('api/search-users/', views.search_users, name='search_users'),
+    path('api/notifications/', views.get_notification_counts, name='get_notification_counts'),
+    path('api/notifications/recent/', views.get_recent_notifications, name='get_recent_notifications'),
+    
+    # Bildirim endpoints
+    path('notifications/', views.notifications_list, name='notifications_list'),
+    path('api/notification/<uuid:notification_id>/read/', views.notification_mark_read, name='notification_mark_read'),
+    path('api/notifications/mark-all-read/', views.notification_mark_all_read, name='notification_mark_all_read'),
+    path('api/notification/<uuid:notification_id>/delete/', views.notification_delete, name='notification_delete'),
 
     # Profil
     path('profile/', views.profile, name='profile'),
