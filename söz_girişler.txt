@@ -1,0 +1,12 @@
+http://localhost:8002/admin/ 
+alidoganbektas@gmail.com
+
+Yeni Oluşturulan Admin Kullanıcısı:
+Kullanıcı adı: admin
+Şifre: admin123
+Email: admin@sozumsoz.com
+
+
+python manage.py runserver 8002
+
+ http://localhost:8002/contracts/admin/dashboard/
