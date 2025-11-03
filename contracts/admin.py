@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     ContractTemplate, Contract, ContractParty,
-    ContractSignature, ContractApproval, ContractComment, UserProfile, Notification
+    ContractSignature, ContractApproval, ContractComment, UserProfile, Notification,
+    SubscriptionPlan, UserSubscription, Payment, PdfDownloadAccess
 )
 
 @admin.register(ContractTemplate)
@@ -135,6 +136,107 @@ class NotificationAdmin(admin.ModelAdmin):
         }),
         ('Metadata', {
             'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+# ==================== ÜCRETLENDİRME SİSTEMİ ====================
+
+@admin.register(SubscriptionPlan)
+class SubscriptionPlanAdmin(admin.ModelAdmin):
+    list_display = ['name', 'plan_type', 'contract_limit', 'price', 'is_active', 'created_at']
+    list_filter = ['plan_type', 'is_active', 'created_at']
+    search_fields = ['name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['price']
+    
+    fieldsets = (
+        ('Temel Bilgiler', {
+            'fields': ('name', 'plan_type', 'description')
+        }),
+        ('Sözleşme Limiti', {
+            'fields': ('contract_limit', 'price')
+        }),
+        ('Özellikler', {
+            'fields': ('features', 'is_active'),
+            'classes': ('collapse',)
+        }),
+        ('Tarihler', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(UserSubscription)
+class UserSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ['user', 'plan', 'status', 'contracts_remaining', 'renew_date', 'auto_renew']
+    list_filter = ['status', 'plan', 'auto_renew', 'start_date']
+    search_fields = ['user__username', 'user__email', 'plan__name']
+    readonly_fields = ['contracts_created_this_month', 'contracts_downloaded_this_month', 'start_date', 'created_at', 'updated_at']
+    ordering = ['-start_date']
+    
+    fieldsets = (
+        ('Kullanıcı ve Plan', {
+            'fields': ('user', 'plan', 'status')
+        }),
+        ('Aylık Kullanım', {
+            'fields': ('contracts_created_this_month', 'contracts_downloaded_this_month')
+        }),
+        ('Tarihler', {
+            'fields': ('start_date', 'end_date', 'renew_date', 'created_at', 'updated_at')
+        }),
+        ('Otomatik Yenileme', {
+            'fields': ('auto_renew',),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ['user', 'amount', 'payment_type', 'status', 'created_at', 'completed_at']
+    list_filter = ['payment_type', 'status', 'created_at']
+    search_fields = ['user__username', 'user__email', 'transaction_id', 'description']
+    readonly_fields = ['transaction_id', 'created_at', 'completed_at']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Ödeme Bilgileri', {
+            'fields': ('user', 'payment_type', 'status', 'amount', 'description')
+        }),
+        ('İşlem Detayları', {
+            'fields': ('transaction_id', 'payment_method')
+        }),
+        ('İlişkiler', {
+            'fields': ('subscription', 'contract'),
+            'classes': ('collapse',)
+        }),
+        ('Tarihler', {
+            'fields': ('created_at', 'completed_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(PdfDownloadAccess)
+class PdfDownloadAccessAdmin(admin.ModelAdmin):
+    list_display = ['user', 'contract', 'accessed_count', 'created_at', 'expires_at']
+    list_filter = ['created_at', 'expires_at']
+    search_fields = ['user__username', 'user__email', 'contract__title']
+    readonly_fields = ['accessed_count', 'created_at']
+    ordering = ['-created_at']
+    
+    fieldsets = (
+        ('Erişim Bilgileri', {
+            'fields': ('user', 'contract', 'payment')
+        }),
+        ('Erişim Detayları', {
+            'fields': ('accessed_count', 'is_valid')
+        }),
+        ('Tarihler', {
+            'fields': ('created_at', 'expires_at'),
             'classes': ('collapse',)
         }),
     )

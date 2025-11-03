@@ -4,6 +4,9 @@ from . import views
 app_name = 'contracts'
 
 urlpatterns = [
+    # Admin Dashboard
+    path('admin/dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    
     # Ana sayfa
     path('', views.home, name='home'),
 

@@ -15,10 +15,14 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Count, Sum
+from datetime import timedelta
 
 from .models import (
     Contract, ContractTemplate, ContractParty,
-    ContractSignature, ContractApproval, ContractComment, Notification
+    ContractSignature, ContractApproval, ContractComment, Notification,
+    UserSubscription, Payment, PdfDownloadAccess
 )
 from .forms import ContractTemplateForm
 
@@ -2036,3 +2040,161 @@ def template_use(request, pk):
     
     messages.success(request, f'"{template.title}" şablonu kullanılarak sözleşme oluşturuldu!')
     return redirect('contracts:contract_detail', pk=contract.pk)
+
+
+# ==================== ADMIN DASHBOARD ====================
+
+@staff_member_required
+def admin_dashboard(request):
+    """Admin dashboard - Sistem istatistikleri ve izleme"""
+    from django.utils import timezone
+    from datetime import datetime, timedelta
+    
+    # Tarih aralıkları
+    today = timezone.now().date()
+    this_month_start = today.replace(day=1)
+    this_year_start = today.replace(month=1, day=1)
+    last_30_days = timezone.now() - timedelta(days=30)
+    
+    # ==================== KULLANICI STATİSTİKLERİ ====================
+    total_users = User.objects.count()
+    active_users = User.objects.filter(is_active=True).count()
+    new_users_this_month = User.objects.filter(
+        date_joined__date__gte=this_month_start
+    ).count()
+    new_users_last_30_days = User.objects.filter(
+        date_joined__gte=last_30_days
+    ).count()
+    
+    # ==================== ABONELİK STATİSTİKLERİ ====================
+    active_subscriptions = UserSubscription.objects.filter(status='active').count()
+    
+    subscriptions_by_plan = UserSubscription.objects.values('plan__name').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    subscription_revenue = Payment.objects.filter(
+        payment_type='subscription',
+        status='completed'
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    monthly_revenue = Payment.objects.filter(
+        payment_type='subscription',
+        status='completed',
+        completed_at__date__gte=this_month_start
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    # ==================== SÖZLEŞME STATİSTİKLERİ ====================
+    total_contracts = Contract.objects.count()
+    contracts_this_month = Contract.objects.filter(
+        created_at__date__gte=this_month_start
+    ).count()
+    
+    contracts_by_status = Contract.objects.values('status').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    signed_contracts = Contract.objects.filter(status='completed').count()
+    average_signers_per_contract = Contract.objects.annotate(
+        signer_count=Count('signatures', filter=Q(signatures__is_signed=True))
+    ).aggregate(avg=Count('id'))['avg'] or 0
+    
+    # ==================== ÖDEME STATİSTİKLERİ ====================
+    total_payments = Payment.objects.filter(status='completed').count()
+    pending_payments = Payment.objects.filter(status='pending').count()
+    failed_payments = Payment.objects.filter(status='failed').count()
+    
+    payments_by_type = Payment.objects.filter(
+        status='completed'
+    ).values('payment_type').annotate(
+        count=Count('id'),
+        total=Sum('amount')
+    ).order_by('-total')
+    
+    total_revenue = Payment.objects.filter(
+        status='completed'
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    # ==================== PDF İNDİRME STATİSTİKLERİ ====================
+    total_pdf_accesses = PdfDownloadAccess.objects.count()
+    pdf_revenue = Payment.objects.filter(
+        payment_type='pdf_download',
+        status='completed'
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    # ==================== BİLDİRİM STATİSTİKLERİ ====================
+    unread_notifications = Notification.objects.filter(is_read=False).count()
+    notifications_by_type = Notification.objects.values('notification_type').annotate(
+        count=Count('id')
+    ).order_by('-count')[:5]
+    
+    # ==================== GRAFIK VERİLERİ ====================
+    # Son 30 günün gelir
+    daily_revenue = []
+    for i in range(29, -1, -1):
+        date = timezone.now() - timedelta(days=i)
+        day_revenue = Payment.objects.filter(
+            status='completed',
+            completed_at__date=date.date()
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        daily_revenue.append({
+            'date': date.strftime('%d.%m'),
+            'revenue': float(day_revenue)
+        })
+    
+    # Son 30 günün sözleşme
+    daily_contracts = []
+    for i in range(29, -1, -1):
+        date = timezone.now() - timedelta(days=i)
+        day_contracts = Contract.objects.filter(
+            created_at__date=date.date()
+        ).count()
+        daily_contracts.append({
+            'date': date.strftime('%d.%m'),
+            'contracts': day_contracts
+        })
+    
+    # ==================== CONTEXT ====================
+    context = {
+        'page_title': 'Admin Dashboard',
+        
+        # Kullanıcı İstatistikleri
+        'total_users': total_users,
+        'active_users': active_users,
+        'new_users_this_month': new_users_this_month,
+        'new_users_last_30_days': new_users_last_30_days,
+        
+        # Abonelik
+        'active_subscriptions': active_subscriptions,
+        'subscriptions_by_plan': subscriptions_by_plan,
+        'subscription_revenue': subscription_revenue,
+        'monthly_revenue': monthly_revenue,
+        
+        # Sözleşme
+        'total_contracts': total_contracts,
+        'contracts_this_month': contracts_this_month,
+        'contracts_by_status': contracts_by_status,
+        'signed_contracts': signed_contracts,
+        'average_signers_per_contract': average_signers_per_contract,
+        
+        # Ödeme
+        'total_payments': total_payments,
+        'pending_payments': pending_payments,
+        'failed_payments': failed_payments,
+        'payments_by_type': payments_by_type,
+        'total_revenue': total_revenue,
+        
+        # PDF
+        'total_pdf_accesses': total_pdf_accesses,
+        'pdf_revenue': pdf_revenue,
+        
+        # Bildirim
+        'unread_notifications': unread_notifications,
+        'notifications_by_type': notifications_by_type,
+        
+        # Grafik Verileri
+        'daily_revenue': daily_revenue,
+        'daily_contracts': daily_contracts,
+    }
+    
+    return render(request, 'admin/dashboard.html', context)

@@ -684,3 +684,182 @@ class UserProfile(models.Model):
             'email': self.email_notifications,
             'push': self.push_notifications,
         }
+
+
+# ==================== ÜCRETLENDİRME SİSTEMİ ====================
+
+class SubscriptionPlan(models.Model):
+    """Abonelik Planları"""
+    PLAN_TYPES = [
+        ('free', 'Ücretsiz'),
+        ('monthly_100', 'Aylık 100 Sözleşme'),
+        ('monthly_200', 'Aylık 200 Sözleşme'),
+    ]
+    
+    name = models.CharField(max_length=100, verbose_name="Plan Adı")
+    plan_type = models.CharField(max_length=20, choices=PLAN_TYPES, unique=True, verbose_name="Plan Tipi")
+    contract_limit = models.PositiveIntegerField(default=5, verbose_name="Aylık Sözleşme Limiti")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Aylık Fiyat (TL)")
+    description = models.TextField(blank=True, verbose_name="Açıklama")
+    features = models.JSONField(default=list, verbose_name="Özellikler")
+    is_active = models.BooleanField(default=True, verbose_name="Aktif")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Abonelik Planı"
+        verbose_name_plural = "Abonelik Planları"
+        ordering = ['price']
+    
+    def __str__(self):
+        return f"{self.name} - {self.contract_limit} sözleşme"
+
+
+class UserSubscription(models.Model):
+    """Kullanıcı Aboneliği"""
+    SUBSCRIPTION_STATUS = [
+        ('active', 'Aktif'),
+        ('inactive', 'İnaktif'),
+        ('expired', 'Süresi Doldu'),
+        ('cancelled', 'İptal Edildi'),
+    ]
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription', verbose_name="Kullanıcı")
+    plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, related_name='subscriptions', verbose_name="Plan")
+    status = models.CharField(max_length=20, choices=SUBSCRIPTION_STATUS, default='active', verbose_name="Durum")
+    
+    # Kontlar
+    contracts_created_this_month = models.PositiveIntegerField(default=0, verbose_name="Bu Ay Oluşturulan Sözleşmeler")
+    contracts_downloaded_this_month = models.PositiveIntegerField(default=0, verbose_name="Bu Ay İndirilen Sözleşmeler")
+    
+    # Tarihler
+    start_date = models.DateTimeField(auto_now_add=True, verbose_name="Başlangıç Tarihi")
+    end_date = models.DateTimeField(null=True, blank=True, verbose_name="Bitiş Tarihi")
+    renew_date = models.DateTimeField(null=True, blank=True, verbose_name="Yenileme Tarihi")
+    
+    # Ödeme
+    auto_renew = models.BooleanField(default=False, verbose_name="Otomatik Yenile")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Kullanıcı Aboneliği"
+        verbose_name_plural = "Kullanıcı Abonelikleri"
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.plan.name}"
+    
+    @property
+    def can_create_contract(self):
+        """Kullanıcı sözleşme oluşturabilir mi"""
+        if not self.plan:
+            return False
+        if self.status != 'active':
+            return False
+        return self.contracts_created_this_month < self.plan.contract_limit
+    
+    @property
+    def contracts_remaining(self):
+        """Kalan sözleşme sayısı"""
+        if not self.plan:
+            return 0
+        return max(0, self.plan.contract_limit - self.contracts_created_this_month)
+    
+    def reset_monthly_counts(self):
+        """Aylık sayaçları sıfırla"""
+        self.contracts_created_this_month = 0
+        self.contracts_downloaded_this_month = 0
+        self.save(update_fields=['contracts_created_this_month', 'contracts_downloaded_this_month'])
+    
+    def increment_created_contracts(self):
+        """Oluşturulan sözleşme sayısını artır"""
+        self.contracts_created_this_month += 1
+        self.save(update_fields=['contracts_created_this_month'])
+
+
+class Payment(models.Model):
+    """Ödeme Bilgileri"""
+    PAYMENT_STATUS = [
+        ('pending', 'Beklemede'),
+        ('completed', 'Tamamlandı'),
+        ('failed', 'Başarısız'),
+        ('cancelled', 'İptal Edildi'),
+    ]
+    
+    PAYMENT_TYPE = [
+        ('subscription', 'Abonelik'),
+        ('pdf_download', 'PDF İndirme'),
+        ('contract_download', 'Sözleşme İndirme'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payments', verbose_name="Kullanıcı")
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE, verbose_name="Ödeme Tipi")
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending', verbose_name="Durum")
+    
+    # Ödeme Detayları
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Tutar (TL)")
+    description = models.CharField(max_length=255, verbose_name="Açıklama")
+    
+    # İlişkiler
+    subscription = models.ForeignKey(UserSubscription, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments', verbose_name="Abonelik")
+    contract = models.ForeignKey(Contract, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments', verbose_name="Sözleşme")
+    
+    # İşlem Detayları
+    transaction_id = models.CharField(max_length=255, unique=True, verbose_name="İşlem ID")
+    payment_method = models.CharField(max_length=50, blank=True, verbose_name="Ödeme Yöntemi")
+    
+    # Tarihler
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Oluşturulma Tarihi")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Tamamlanma Tarihi")
+    
+    class Meta:
+        verbose_name = "Ödeme"
+        verbose_name_plural = "Ödemeler"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['transaction_id']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.amount} TL - {self.get_status_display()}"
+    
+    def mark_as_completed(self):
+        """Ödemeyi tamamlandı olarak işaretle"""
+        self.status = 'completed'
+        self.completed_at = timezone.now()
+        self.save(update_fields=['status', 'completed_at'])
+
+
+class PdfDownloadAccess(models.Model):
+    """PDF İndirme Erişimi"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='pdf_accesses', verbose_name="Kullanıcı")
+    contract = models.ForeignKey(Contract, on_delete=models.CASCADE, related_name='pdf_accesses', verbose_name="Sözleşme")
+    payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, null=True, related_name='pdf_accesses', verbose_name="Ödeme")
+    
+    accessed_count = models.PositiveIntegerField(default=0, verbose_name="Erişim Sayısı")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Satın Alındığı Tarih")
+    expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Bitiş Tarihi")
+    
+    class Meta:
+        verbose_name = "PDF İndirme Erişimi"
+        verbose_name_plural = "PDF İndirme Erişimleri"
+        unique_together = ['user', 'contract']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.contract.title}"
+    
+    @property
+    def is_valid(self):
+        """Erişim hâlâ geçerli mi"""
+        if self.expires_at:
+            return self.expires_at > timezone.now()
+        return True
+    
+    def increment_access(self):
+        """Erişim sayısını artır"""
+        self.accessed_count += 1
+        self.save(update_fields=['accessed_count'])

@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Admin Dashboard - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-chart-line me-2"></i>
+                Admin Dashboard
+            </h1>
+            <p class="text-muted small">Sistem istatistikleri ve izleme</p>
+        </div>
+    </div>
+
+    <!-- İstatistik Kartları -->
+    <div class="row mb-4">
+        <!-- Toplam Gelir -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Toplam Gelir</h6>
+                            <h3 class="mb-0">{{ total_revenue|floatformat:0 }} TL</h3>
+                            <small class="text-success">Bu ay: {{ monthly_revenue|floatformat:0 }} TL</small>
+                        </div>
+                        <i class="fas fa-wallet fa-2x text-success opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toplam Kullanıcı -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Toplam Kullanıcı</h6>
+                            <h3 class="mb-0">{{ total_users }}</h3>
+                            <small class="text-info">Aktif: {{ active_users }} • Bu ay: {{ new_users_this_month }}</small>
+                        </div>
+                        <i class="fas fa-users fa-2x text-info opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aktif Abonelikler -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Aktif Abonelikler</h6>
+                            <h3 class="mb-0">{{ active_subscriptions }}</h3>
+                            <small class="text-primary">Yinelenen: {{ subscription_revenue|floatformat:0 }} TL</small>
+                        </div>
+                        <i class="fas fa-star fa-2x text-primary opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toplam Sözleşme -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Toplam Sözleşme</h6>
+                            <h3 class="mb-0">{{ total_contracts }}</h3>
+                            <small class="text-warning">Bu ay: {{ contracts_this_month }} • Tamamlanan: {{ signed_contracts }}</small>
+                        </div>
+                        <i class="fas fa-file-contract fa-2x text-warning opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <!-- Ödeme İstatistikleri -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Tamamlanan Ödemeler</h6>
+                            <h3 class="mb-0">{{ total_payments }}</h3>
+                            <small class="text-success">Beklemede: {{ pending_payments }} • Başarısız: {{ failed_payments }}</small>
+                        </div>
+                        <i class="fas fa-credit-card fa-2x text-success opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PDF İndirmeleri -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">PDF İndirmeleri</h6>
+                            <h3 class="mb-0">{{ total_pdf_accesses }}</h3>
+                            <small class="text-info">Gelir: {{ pdf_revenue|floatformat:0 }} TL</small>
+                        </div>
+                        <i class="fas fa-file-pdf fa-2x text-danger opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Okunmamış Bildirimler -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Okunmamış Bildirimler</h6>
+                            <h3 class="mb-0">{{ unread_notifications }}</h3>
+                            <small class="text-muted">Sistem bildirim sayısı</small>
+                        </div>
+                        <i class="fas fa-bell fa-2x text-warning opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Yeni Kullanıcılar -->
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="text-muted mb-2">Yeni Kullanıcılar</h6>
+                            <h3 class="mb-0">{{ new_users_last_30_days }}</h3>
+                            <small class="text-info">Son 30 gün</small>
+                        </div>
+                        <i class="fas fa-user-plus fa-2x text-info opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafıkler -->
+    <div class="row mb-4">
+        <!-- Günlük Gelir Grafiği -->
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Son 30 Günün Geliri
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Günlük Sözleşme Grafiği -->
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Son 30 Günün Sözleşmeleri
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="contractsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detaylı Tablo Verileri -->
+    <div class="row">
+        <!-- Abonelik Planları Dağılımı -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-pie-chart me-2"></i>
+                        Plan Dağılımı
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-striped">
+                        <tbody>
+                            {% for plan in subscriptions_by_plan %}
+                                <tr>
+                                    <td>{{ plan.plan__name }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-info">{{ plan.count }}</span>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="2" class="text-center text-muted">Veri yok</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sözleşme Durumları -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tasks me-2"></i>
+                        Sözleşme Durumları
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-striped">
+                        <tbody>
+                            {% for status in contracts_by_status %}
+                                <tr>
+                                    <td>{{ status.status }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-primary">{{ status.count }}</span>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="2" class="text-center text-muted">Veri yok</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ödeme Türleri -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-receipt me-2"></i>
+                        Ödeme Türleri
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-striped">
+                        <tbody>
+                            {% for payment in payments_by_type %}
+                                <tr>
+                                    <td>{{ payment.payment_type }}</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-success">{{ payment.total|floatformat:0 }} TL</span>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="2" class="text-center text-muted">Veri yok</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js Kütüphanesi -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<script>
+    // Gelir Grafiği
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    const revenueData = {{ daily_revenue|safe }};
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: revenueData.map(d => d.date),
+            datasets: [{
+                label: 'Günlük Gelir (TL)',
+                data: revenueData.map(d => d.revenue),
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.3,
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // Sözleşme Grafiği
+    const contractsCtx = document.getElementById('contractsChart').getContext('2d');
+    const contractsData = {{ daily_contracts|safe }};
+    new Chart(contractsCtx, {
+        type: 'bar',
+        data: {
+            labels: contractsData.map(d => d.date),
+            datasets: [{
+                label: 'Günlük Sözleşmeler',
+                data: contractsData.map(d => d.contracts),
+                backgroundColor: '#007bff',
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+</script>
+
+<style>
+    .card {
+        border-radius: 10px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+    }
+    
+    .card-header {
+        border-radius: 10px 10px 0 0;
+        border: none;
+    }
+</style>
+{% endblock %}
