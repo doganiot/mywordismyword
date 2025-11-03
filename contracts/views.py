@@ -298,7 +298,24 @@ def home(request):
 
 @login_required
 def contract_create(request):
-    """Yeni sözleşme oluşturma"""
+    """Sözleşme oluştur"""
+    # Abonelik kontrolü - sözleşme limitini kontrol et
+    user_subscription = getattr(request.user, 'subscription', None)
+    if not user_subscription:
+        messages.error(request, 'Abonelik bilgileriniz bulunamadı. Lütfen yöneticiye başvurun.')
+        return redirect('contracts:home')
+    
+    # Sözleşme limiti kontrolü
+    if not user_subscription.can_create_contract:
+        messages.error(
+            request,
+            f'Bu ay sözleşme oluşturma limitinize ulaştınız. '
+            f'Limiti: {user_subscription.plan.contract_limit} sözleşme/ay. '
+            f'Kalan: {user_subscription.contracts_remaining} sözleşme. '
+            f'Yüksek paket almak için Planlar sayfasını ziyaret edin.'
+        )
+        return redirect('contracts:my_contracts')
+    
     if request.method == 'POST':
         title = request.POST.get('title')
         content = request.POST.get('content')
@@ -437,6 +454,9 @@ def contract_create(request):
         contract.content = updated_content
         contract.save()
 
+        # Abonelikte sözleşme sayacını artır
+        user_subscription.increment_created_contracts()
+
         messages.success(request, 'Sözleşme başarıyla oluşturuldu!')
         return redirect('contracts:contract_detail', pk=contract.pk)
 
@@ -545,8 +565,25 @@ def contract_detail(request, pk):
             signatures__is_signed=True
         ).distinct().count()
 
+    # Free kullanıcılar için content sınırlaması
+    user_subscription = getattr(request.user, 'subscription', None) if request.user.is_authenticated else None
+    is_free_user = user_subscription and user_subscription.plan.plan_type == 'free'
+    is_creator = request.user.is_authenticated and contract.creator == request.user
+    
+    # Content gösterilecek mi?
+    contract_content = contract.content
+    content_restricted = False
+    
+    if is_free_user and not is_creator and request.user.is_authenticated:
+        # Free kullanıcıya (oluşturucu değilse) sadece ilk 500 karakter göster
+        if len(contract.content) > 500:
+            contract_content = contract.content[:500] + '\n\n[...]\n\n[Sözleşmeyi tam olarak görmek için Premium plan satın alın]'
+            content_restricted = True
+
     context = {
         'contract': contract,
+        'contract_content': contract_content,
+        'content_restricted': content_restricted,
         'user_party': user_party,
         'parties': contract.parties.all(),
         'signatures': contract.signatures.all(),

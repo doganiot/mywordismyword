@@ -53,7 +53,13 @@
 
                     <!-- Sözleşme İçeriği -->
                     <div class="contract-content border rounded p-4 bg-light">
-                        <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ contract.get_content_with_signatures }}</pre>
+                        <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ contract_content }}</pre>
+                        {% if content_restricted %}
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <i class="fas fa-lock me-2"></i>
+                                <strong>İçerik Sınırlı:</strong> Tam sözleşmeyi görmek için Premium plana yükseltin.
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
