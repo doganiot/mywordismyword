@@ -1,0 +1,405 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ user.get_full_name|default:user.username }} - sözümSöz Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="h3 mb-2">{{ user.get_full_name|default:user.username }}</h1>
+                    <p class="text-muted small">@{{ user.username }}</p>
+                </div>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'contracts:admin_users_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-2"></i>
+                        Listeye Don
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Temel Bilgiler -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Kullanici Bilgileri
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Ad Soyad</label>
+                            <p class="mb-0"><strong>{{ user.get_full_name|default:"Belirtilmemis" }}</strong></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Email</label>
+                            <p class="mb-0"><strong>{{ user.email }}</strong></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Kullanici Adi</label>
+                            <p class="mb-0"><strong>@{{ user.username }}</strong></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Kayit Tarihi</label>
+                            <p class="mb-0"><strong>{{ user.date_joined|date:"d.m.Y H:i" }}</strong></p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted small">Son Giris</label>
+                            <p class="mb-0">
+                                {% if user.last_login %}
+                                    <strong>{{ user.last_login|date:"d.m.Y H:i" }}</strong>
+                                {% else %}
+                                    <strong class="text-muted">Henuz Giris Yapmadi</strong>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6 mb-0">
+                            <label class="text-muted small">Durum</label>
+                            <p class="mb-0">
+                                {% if user.is_active %}
+                                    <span class="badge bg-success">Aktif</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Pasif</span>
+                                {% endif %}
+                                {% if user.is_staff %}
+                                    <span class="badge bg-warning">Admin</span>
+                                {% endif %}
+                                {% if user.is_superuser %}
+                                    <span class="badge bg-danger">Super Admin</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if user.userprofile %}
+                        <hr class="my-3">
+                        <h6 class="mb-3">
+                            <i class="fas fa-file-alt me-2"></i>
+                            Profil Bilgileri
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="text-muted small">Telefon</label>
+                                <p class="mb-0">
+                                    <strong>{{ user.userprofile.phone|default:"Kayitli Degil" }}</strong>
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="text-muted small">Adres</label>
+                                <p class="mb-0">
+                                    <strong>{{ user.userprofile.address|default:"Kayitli Degil" }}</strong>
+                                </p>
+                            </div>
+                            {% if user.userprofile.birth_date %}
+                                <div class="col-md-6 mb-0">
+                                    <label class="text-muted small">Dogum Tarihi</label>
+                                    <p class="mb-0">
+                                        <strong>{{ user.userprofile.birth_date|date:"d.m.Y" }}</strong>
+                                    </p>
+                                </div>
+                            {% endif %}
+                            {% if user.userprofile.gender %}
+                                <div class="col-md-6 mb-0">
+                                    <label class="text-muted small">Cinsiyet</label>
+                                    <p class="mb-0">
+                                        <strong>{{ user.userprofile.get_gender_display }}</strong>
+                                    </p>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <hr class="my-3">
+                        <h6 class="mb-3">
+                            <i class="fas fa-bell me-2"></i>
+                            Bildirim Tercihleri
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-0">
+                                <label class="text-muted small">Email Bildirimleri</label>
+                                <p class="mb-0">
+                                    {% if user.userprofile.email_notifications %}
+                                        <span class="badge bg-success">Aktif</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Deaktif</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            <div class="col-md-6 mb-0">
+                                <label class="text-muted small">Push Bildirimleri</label>
+                                <p class="mb-0">
+                                    {% if user.userprofile.push_notifications %}
+                                        <span class="badge bg-success">Aktif</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Deaktif</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sağ Sidebar - Özet İstatistikler -->
+        <div class="col-lg-4">
+            <!-- Abonelik Bilgisi -->
+            {% if subscription %}
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">
+                            <i class="fas fa-star me-2"></i>
+                            Abonelik
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Plan</small>
+                            <p class="mb-0">
+                                <strong class="text-primary">{{ subscription.plan.name }}</strong>
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Durum</small>
+                            <p class="mb-0">
+                                {% if subscription.status == 'active' %}
+                                    <span class="badge bg-success">Aktif</span>
+                                {% elif subscription.status == 'inactive' %}
+                                    <span class="badge bg-secondary">İnaktif</span>
+                                {% elif subscription.status == 'expired' %}
+                                    <span class="badge bg-danger">Süresi Doldu</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ subscription.status }}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Sozlesme Limiti</small>
+                            <p class="mb-0">
+                                <strong>{{ subscription.contracts_created_this_month }} / {{ subscription.plan.contract_limit }}</strong>
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Baslangi Tarihi</small>
+                            <p class="mb-0">
+                                <strong>{{ subscription.start_date|date:"d.m.Y" }}</strong>
+                            </p>
+                        </div>
+                        {% if subscription.end_date %}
+                            <div class="mb-0">
+                                <small class="text-muted">Bitis Tarihi</small>
+                                <p class="mb-0">
+                                    <strong>{{ subscription.end_date|date:"d.m.Y" }}</strong>
+                                </p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- İstatistikler -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        İstatistikler
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <small class="text-muted">Olusturulan Sozlesme</small>
+                            <p class="mb-0"><strong class="h5">{{ created_contracts.count }}</strong></p>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <small class="text-muted">Taraf Oldugu Sozlesme</small>
+                            <p class="mb-0"><strong class="h5">{{ party_contracts.count }}</strong></p>
+                        </div>
+                        <div class="col-6 mb-0">
+                            <small class="text-muted">Toplam Odemeler</small>
+                            <p class="mb-0"><strong class="h5">{{ payments.count }}</strong></p>
+                        </div>
+                        <div class="col-6 mb-0">
+                            <small class="text-muted">Toplam Gelir</small>
+                            <p class="mb-0"><strong class="h5">{{ total_revenue }} TL</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hızlı İşlem -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>
+                        Hizli İslem
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-outline-warning btn-sm w-100 mb-2" onclick="toggleUserStatus({{ user.id }})">
+                        {% if user.is_active %}
+                            <i class="fas fa-lock me-2"></i> Kullaniciyi Deaktive Et
+                        {% else %}
+                            <i class="fas fa-unlock me-2"></i> Kullaniciyi Aktive Et
+                        {% endif %}
+                    </button>
+                    {% if not user.is_staff %}
+                        <button class="btn btn-outline-info btn-sm w-100" onclick="makeUserAdmin({{ user.id }})">
+                            <i class="fas fa-crown me-2"></i> Admin Yap
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Oluşturulan Sözleşmeler -->
+    {% if created_contracts %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-file-contract me-2"></i>
+                    Olusturulan Sozlesmeler ({{ created_contracts.count }})
+                </h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Baslik</th>
+                            <th>Durum</th>
+                            <th>Tarih</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contract in created_contracts|slice:":10" %}
+                            <tr>
+                                <td><strong>{{ contract.title }}</strong></td>
+                                <td>
+                                    {% if contract.status == 'draft' %}
+                                        <span class="badge bg-secondary">Taslak</span>
+                                    {% elif contract.status == 'pending' %}
+                                        <span class="badge bg-warning">Beklemede</span>
+                                    {% elif contract.status == 'signed' %}
+                                        <span class="badge bg-info">Imzalı</span>
+                                    {% elif contract.status == 'completed' %}
+                                        <span class="badge bg-success">Tamamlandi</span>
+                                    {% elif contract.status == 'rejected' %}
+                                        <span class="badge bg-danger">Red Edildi</span>
+                                    {% endif %}
+                                </td>
+                                <td><small>{{ contract.created_at|date:"d.m.Y" }}</small></td>
+                                <td>
+                                    <a href="{% url 'contracts:admin_contract_detail' contract.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if created_contracts.count > 10 %}
+                <div class="card-footer bg-light text-center">
+                    <small class="text-muted">
+                        Gosterilen: 10 / {{ created_contracts.count }} sozlesme
+                        <a href="{% url 'contracts:admin_contracts_list' %}?creator={{ user.id }}">
+                            Tümünü Görüntüle →
+                        </a>
+                    </small>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- Ödemeler -->
+    {% if payments %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-credit-card me-2"></i>
+                    Odeme Gecmisi ({{ payments.count }})
+                </h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tur</th>
+                            <th>Tutar</th>
+                            <th>Durum</th>
+                            <th>Tarih</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments|slice:":10" %}
+                            <tr>
+                                <td>
+                                    {% if payment.payment_type == 'pdf_download' %}
+                                        <span class="badge bg-danger">PDF İndirme</span>
+                                    {% elif payment.payment_type == 'subscription' %}
+                                        <span class="badge bg-primary">Abonelik</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ payment.payment_type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ payment.amount }} TL</strong></td>
+                                <td>
+                                    {% if payment.status == 'completed' %}
+                                        <span class="badge bg-success">Tamamlandi</span>
+                                    {% elif payment.status == 'pending' %}
+                                        <span class="badge bg-warning">Beklemede</span>
+                                    {% elif payment.status == 'failed' %}
+                                        <span class="badge bg-danger">Basarısız</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ payment.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td><small>{{ payment.created_at|date:"d.m.Y H:i" }}</small></td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-3">
+                                    <small class="text-muted">Henuz odeme yapilmamis</small>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function toggleUserStatus(userId) {
+    if (confirm('Kullanici durumunu degistirmek istediginize emin misiniz?')) {
+        // API call or form submission
+        alert('Bu islem henuz entegre edilmemistir');
+    }
+}
+
+function makeUserAdmin(userId) {
+    if (confirm('Bu kullaniciya Admin yetkisi vermek istediginize emin misiniz?')) {
+        // API call or form submission
+        alert('Bu islem henuz entegre edilmemistir');
+    }
+}
+</script>
+
+<style>
+    .badge {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+</style>
+{% endblock %}
+

@@ -2328,3 +2328,84 @@ def admin_contract_detail(request, pk):
     }
     
     return render(request, 'admin/contract_detail.html', context)
+
+
+@staff_member_required
+def admin_users_list(request):
+    """Admin - Tum kullanicilar listesi"""
+    # Filtreleme
+    search = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+    sort_by = request.GET.get('sort', '-date_joined')
+    
+    # Base queryset
+    users = User.objects.all()
+    
+    # Filtreleme uygula
+    if search:
+        users = users.filter(
+            Q(username__icontains=search) |
+            Q(email__icontains=search) |
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search)
+        )
+    
+    if status_filter == 'active':
+        users = users.filter(is_active=True)
+    elif status_filter == 'inactive':
+        users = users.filter(is_active=False)
+    elif status_filter == 'staff':
+        users = users.filter(is_staff=True)
+    
+    # Sirala
+    users = users.order_by(sort_by)
+    
+    # Sayfalama
+    from django.core.paginator import Paginator
+    paginator = Paginator(users, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'total_count': users.count(),
+        'search': search,
+        'status_filter': status_filter,
+        'sort_by': sort_by,
+    }
+    
+    return render(request, 'admin/users_list.html', context)
+
+
+@staff_member_required
+def admin_user_detail(request, user_id):
+    """Admin - Kullanici detaylari"""
+    user = get_object_or_404(User, id=user_id)
+    
+    # Kullanici tarafından olusturulan sozlesmeler
+    created_contracts = Contract.objects.filter(creator=user)
+    
+    # Kullanıcının taraf olduğu sözleşmeler
+    party_contracts = Contract.objects.filter(parties__user=user).distinct()
+    
+    # Abonelik bilgisi
+    subscription = getattr(user, 'subscription', None)
+    
+    # Ödemeler
+    payments = Payment.objects.filter(user=user).order_by('-created_at')
+    
+    # İstatistikler
+    total_revenue = payments.filter(status='completed').aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+    
+    context = {
+        'user': user,
+        'created_contracts': created_contracts,
+        'party_contracts': party_contracts,
+        'subscription': subscription,
+        'payments': payments,
+        'total_revenue': total_revenue,
+    }
+    
+    return render(request, 'admin/user_detail.html', context)

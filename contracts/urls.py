@@ -8,6 +8,8 @@ urlpatterns = [
     path('dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('dashboard/contracts/', views.admin_contracts_list, name='admin_contracts_list'),
     path('dashboard/contracts/<uuid:pk>/', views.admin_contract_detail, name='admin_contract_detail'),
+    path('dashboard/users/', views.admin_users_list, name='admin_users_list'),
+    path('dashboard/users/<int:user_id>/', views.admin_user_detail, name='admin_user_detail'),
     
     # Ana sayfa
     path('', views.home, name='home'),
