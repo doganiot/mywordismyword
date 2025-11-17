@@ -6,6 +6,8 @@ app_name = 'contracts'
 urlpatterns = [
     # Admin Dashboard
     path('dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('dashboard/contracts/', views.admin_contracts_list, name='admin_contracts_list'),
+    path('dashboard/contracts/<uuid:pk>/', views.admin_contract_detail, name='admin_contract_detail'),
     
     # Ana sayfa
     path('', views.home, name='home'),

@@ -2235,3 +2235,96 @@ def admin_dashboard(request):
     }
     
     return render(request, 'admin/dashboard.html', context)
+
+
+@staff_member_required
+def admin_contracts_list(request):
+    """Admin - Tum sozlesmeler listesi"""
+    # Filtreleme
+    status_filter = request.GET.get('status', '')
+    creator_filter = request.GET.get('creator', '')
+    search = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', '-created_at')
+    
+    # Base queryset
+    contracts = Contract.objects.all()
+    
+    # Filtreleme uygula
+    if status_filter:
+        contracts = contracts.filter(status=status_filter)
+    
+    if creator_filter:
+        contracts = contracts.filter(creator__id=creator_filter)
+    
+    if search:
+        contracts = contracts.filter(
+            Q(title__icontains=search) |
+            Q(creator__username__icontains=search) |
+            Q(creator__email__icontains=search)
+        )
+    
+    # Sirala
+    contracts = contracts.order_by(sort_by)
+    
+    # Sayfalama
+    from django.core.paginator import Paginator
+    paginator = Paginator(contracts, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Filtreleme seçenekleri
+    status_choices = [
+        ('', 'Tum Durumlari'),
+        ('draft', 'Taslak'),
+        ('pending', 'Beklemede'),
+        ('signed', 'Imzalı'),
+        ('completed', 'Tamamlandi'),
+        ('rejected', 'Red Edildi'),
+    ]
+    
+    creators = User.objects.filter(contract__isnull=False).distinct().order_by('username')
+    
+    context = {
+        'page_obj': page_obj,
+        'total_count': contracts.count(),
+        'status_choices': status_choices,
+        'creators': creators,
+        'status_filter': status_filter,
+        'creator_filter': creator_filter,
+        'search': search,
+        'sort_by': sort_by,
+    }
+    
+    return render(request, 'admin/contracts_list.html', context)
+
+
+@staff_member_required
+def admin_contract_detail(request, pk):
+    """Admin - Sozlesme detaylari"""
+    contract = get_object_or_404(Contract, id=pk)
+    
+    # Taraflar
+    parties = ContractParty.objects.filter(contract=contract)
+    
+    # İmzalar
+    signatures = ContractSignature.objects.filter(contract=contract)
+    
+    # Yorumlar
+    comments = ContractComment.objects.filter(contract=contract).order_by('-created_at')
+    
+    # Ödemeler
+    payments = Payment.objects.filter(contract=contract)
+    
+    # PDF erişimi
+    pdf_accesses = PdfDownloadAccess.objects.filter(contract=contract)
+    
+    context = {
+        'contract': contract,
+        'parties': parties,
+        'signatures': signatures,
+        'comments': comments,
+        'payments': payments,
+        'pdf_accesses': pdf_accesses,
+    }
+    
+    return render(request, 'admin/contract_detail.html', context)

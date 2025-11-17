@@ -9,4 +9,4 @@ Email: admin@sozumsoz.com
 
 python manage.py runserver 8002
 
- http://localhost:8002/contracts/admin/dashboard/
+http://localhost:8002/dashboard/
