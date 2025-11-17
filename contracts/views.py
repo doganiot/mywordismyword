@@ -2409,3 +2409,131 @@ def admin_user_detail(request, user_id):
     }
     
     return render(request, 'admin/user_detail.html', context)
+
+
+@staff_member_required
+def admin_subscriptions_list(request):
+    """Admin - Tum abonelikler listesi"""
+    # Filtreleme
+    plan_filter = request.GET.get('plan', '')
+    status_filter = request.GET.get('status', '')
+    search = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', '-start_date')
+    
+    # Base queryset
+    subscriptions = UserSubscription.objects.select_related('user', 'plan')
+    
+    # Filtreleme uygula
+    if plan_filter:
+        subscriptions = subscriptions.filter(plan__name=plan_filter)
+    
+    if status_filter:
+        subscriptions = subscriptions.filter(status=status_filter)
+    
+    if search:
+        subscriptions = subscriptions.filter(
+            Q(user__username__icontains=search) |
+            Q(user__email__icontains=search) |
+            Q(user__first_name__icontains=search) |
+            Q(user__last_name__icontains=search)
+        )
+    
+    # Sirala
+    subscriptions = subscriptions.order_by(sort_by)
+    
+    # Sayfalama
+    from django.core.paginator import Paginator
+    paginator = Paginator(subscriptions, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Plan seçenekleri
+    from .models import SubscriptionPlan
+    plans = SubscriptionPlan.objects.values_list('name', flat=True).distinct()
+    
+    context = {
+        'page_obj': page_obj,
+        'total_count': subscriptions.count(),
+        'plans': plans,
+        'plan_filter': plan_filter,
+        'status_filter': status_filter,
+        'search': search,
+        'sort_by': sort_by,
+    }
+    
+    return render(request, 'admin/subscriptions_list.html', context)
+
+
+@staff_member_required
+def admin_payments_list(request):
+    """Admin - Tum odemeler listesi"""
+    # Filtreleme
+    payment_type_filter = request.GET.get('payment_type', '')
+    status_filter = request.GET.get('status', '')
+    search = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', '-created_at')
+    
+    # Tarih filtreleme
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    
+    # Base queryset
+    payments = Payment.objects.select_related('user', 'subscription', 'contract').all()
+    
+    # Filtreleme uygula
+    if payment_type_filter:
+        payments = payments.filter(payment_type=payment_type_filter)
+    
+    if status_filter:
+        payments = payments.filter(status=status_filter)
+    
+    if search:
+        payments = payments.filter(
+            Q(user__username__icontains=search) |
+            Q(user__email__icontains=search) |
+            Q(transaction_id__icontains=search)
+        )
+    
+    if date_from:
+        try:
+            from datetime import datetime
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            payments = payments.filter(created_at__date__gte=date_from_obj)
+        except:
+            pass
+    
+    if date_to:
+        try:
+            from datetime import datetime
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            payments = payments.filter(created_at__date__lte=date_to_obj)
+        except:
+            pass
+    
+    # Sirala
+    payments = payments.order_by(sort_by)
+    
+    # Sayfalama
+    from django.core.paginator import Paginator
+    paginator = Paginator(payments, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # İstatistikler
+    total_amount = payments.filter(status='completed').aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+    
+    context = {
+        'page_obj': page_obj,
+        'total_count': payments.count(),
+        'total_amount': total_amount,
+        'payment_type_filter': payment_type_filter,
+        'status_filter': status_filter,
+        'search': search,
+        'sort_by': sort_by,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    
+    return render(request, 'admin/payments_list.html', context)

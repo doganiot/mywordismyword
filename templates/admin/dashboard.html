@@ -17,13 +17,21 @@
                     <p class="text-muted small">Sistem istatistikleri ve izleme</p>
                 </div>
                 <div class="btn-group" role="group">
-                    <a href="{% url 'contracts:admin_users_list' %}" class="btn btn-outline-primary">
-                        <i class="fas fa-users me-2"></i>
-                        Tum Kullanicilar
+                    <a href="{% url 'contracts:admin_users_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-users me-1"></i>
+                        Kullanicilar
                     </a>
-                    <a href="{% url 'contracts:admin_contracts_list' %}" class="btn btn-primary">
-                        <i class="fas fa-file-contract me-2"></i>
-                        Tum Sozlesmeler
+                    <a href="{% url 'contracts:admin_contracts_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-file-contract me-1"></i>
+                        Sozlesmeler
+                    </a>
+                    <a href="{% url 'contracts:admin_subscriptions_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-star me-1"></i>
+                        Abonelikler
+                    </a>
+                    <a href="{% url 'contracts:admin_payments_list' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-credit-card me-1"></i>
+                        Odemeler
                     </a>
                 </div>
             </div>

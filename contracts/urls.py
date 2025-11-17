@@ -10,6 +10,8 @@ urlpatterns = [
     path('dashboard/contracts/<uuid:pk>/', views.admin_contract_detail, name='admin_contract_detail'),
     path('dashboard/users/', views.admin_users_list, name='admin_users_list'),
     path('dashboard/users/<int:user_id>/', views.admin_user_detail, name='admin_user_detail'),
+    path('dashboard/subscriptions/', views.admin_subscriptions_list, name='admin_subscriptions_list'),
+    path('dashboard/payments/', views.admin_payments_list, name='admin_payments_list'),
     
     # Ana sayfa
     path('', views.home, name='home'),

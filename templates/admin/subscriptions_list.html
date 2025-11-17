@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Admin - Abonelikler - sözümSöz{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Başlık -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-star me-2"></i>
+                        Abonelikler
+                    </h1>
+                    <p class="text-muted small">Toplam: <strong>{{ total_count }}</strong> abonelik</p>
+                </div>
+                <a href="{% url 'contracts:admin_dashboard' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    Dashboard'a Don
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtreleme Paneli -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-filter me-2"></i>
+                Filtreleme
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <!-- Arama -->
+                <div class="col-md-3">
+                    <label class="form-label">Ara</label>
+                    <input 
+                        type="text" 
+                        name="search" 
+                        class="form-control" 
+                        placeholder="Kullanici, email..."
+                        value="{{ search }}"
+                    >
+                </div>
+
+                <!-- Plan Filtresi -->
+                <div class="col-md-2">
+                    <label class="form-label">Plan</label>
+                    <select name="plan" class="form-select">
+                        <option value="">Tum Planlar</option>
+                        {% for plan in plans %}
+                            <option value="{{ plan }}" {% if plan == plan_filter %}selected{% endif %}>
+                                {{ plan }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Status Filtresi -->
+                <div class="col-md-2">
+                    <label class="form-label">Durum</label>
+                    <select name="status" class="form-select">
+                        <option value="">Tum Durumlar</option>
+                        <option value="active" {% if status_filter == "active" %}selected{% endif %}>
+                            Aktif
+                        </option>
+                        <option value="inactive" {% if status_filter == "inactive" %}selected{% endif %}>
+                            İnaktif
+                        </option>
+                        <option value="expired" {% if status_filter == "expired" %}selected{% endif %}>
+                            Süresi Doldu
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Sıralama -->
+                <div class="col-md-2">
+                    <label class="form-label">Sirala</label>
+                    <select name="sort" class="form-select">
+                        <option value="-start_date" {% if sort_by == "-start_date" %}selected{% endif %}>
+                            En Yeni
+                        </option>
+                        <option value="start_date" {% if sort_by == "start_date" %}selected{% endif %}>
+                            En Eski
+                        </option>
+                    </select>
+                </div>
+
+                <!-- Butonlar -->
+                <div class="col-md-3 d-flex gap-2 align-items-end">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="fas fa-search me-2"></i>
+                        Ara
+                    </button>
+                    <a href="{% url 'contracts:admin_subscriptions_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-redo me-2"></i>
+                        Sifirla
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Abonelik Listesi -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-list me-2"></i>
+                Abonelikler
+            </h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Kullanici</th>
+                        <th>Plan</th>
+                        <th>Durum</th>
+                        <th>Sozlesme Limiti</th>
+                        <th>Baslangi Tarihi</th>
+                        <th>Bitis Tarihi</th>
+                        <th>İşlem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subscription in page_obj %}
+                        <tr>
+                            <td>
+                                <strong>{{ subscription.user.get_full_name|default:subscription.user.username }}</strong>
+                                <br>
+                                <small class="text-muted">{{ subscription.user.email }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ subscription.plan.name }}</span>
+                            </td>
+                            <td>
+                                {% if subscription.status == 'active' %}
+                                    <span class="badge bg-success">Aktif</span>
+                                {% elif subscription.status == 'inactive' %}
+                                    <span class="badge bg-secondary">İnaktif</span>
+                                {% elif subscription.status == 'expired' %}
+                                    <span class="badge bg-danger">Süresi Doldu</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">{{ subscription.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>
+                                    {{ subscription.contracts_created_this_month }} / {{ subscription.plan.contract_limit }}
+                                </small>
+                            </td>
+                            <td>
+                                <small>{{ subscription.start_date|date:"d.m.Y" }}</small>
+                            </td>
+                            <td>
+                                {% if subscription.end_date %}
+                                    <small>{{ subscription.end_date|date:"d.m.Y" }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a 
+                                    href="{% url 'contracts:admin_user_detail' subscription.user.id %}" 
+                                    class="btn btn-sm btn-outline-primary"
+                                    title="Kullanici Detaylari"
+                                >
+                                    <i class="fas fa-user"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <p class="text-muted mb-0">
+                                    <i class="fas fa-inbox fa-2x mb-3 d-block opacity-50"></i>
+                                    Kayitli abonelik yok
+                                </p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sayfalama -->
+    {% if page_obj.has_other_pages %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                            <i class="fas fa-chevron-left"></i> Ilk
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                            Onceki
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                    {% else %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                                {{ num }}
+                            </a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                            Sonraki
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if plan_filter %}&plan={{ plan_filter }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                            Son <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+
+<style>
+    .table-hover tbody tr:hover {
+        background-color: rgba(0,0,0,0.02);
+    }
+</style>
+{% endblock %}
+
