@@ -2282,7 +2282,7 @@ def admin_contracts_list(request):
         ('rejected', 'Red Edildi'),
     ]
     
-    creators = User.objects.filter(contract__isnull=False).distinct().order_by('username')
+    creators = User.objects.filter(created_contracts__isnull=False).distinct().order_by('username')
     
     context = {
         'page_obj': page_obj,
