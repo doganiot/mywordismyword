@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load tag_extras %}
 
 {% block title %}{{ contract.title }} - sözümSöz Admin{% endblock %}
 
@@ -467,9 +468,6 @@
         </div>
     {% endif %}
 </div>
-
-<!-- Custom Template Filter -->
-{% load tag_extras %}
 
 <style>
     .card {
